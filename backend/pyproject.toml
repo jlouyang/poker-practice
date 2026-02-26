@@ -1,0 +1,29 @@
+[project]
+name = "poker-training-engine"
+version = "0.1.0"
+description = "AI-powered poker practice platform"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "phevaluator>=0.5",
+    "pydantic>=2.10",
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.20",
+    "websockets>=14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
