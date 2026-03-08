@@ -86,7 +86,14 @@ class AnalysisRecord(Base):
 
 import os
 
-_DEFAULT_DB_PATH = os.environ.get("POKER_DB_PATH", "poker_history.db")
+# Railway: when a volume is attached, RAILWAY_VOLUME_MOUNT_PATH is set (e.g. /data)
+_railway_volume = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+_default_db = (
+    f"{_railway_volume.rstrip('/')}/poker_history.db"
+    if _railway_volume
+    else os.environ.get("POKER_DB_PATH", "poker_history.db")
+)
+_DEFAULT_DB_PATH = _default_db
 
 
 def get_engine(db_path: str = _DEFAULT_DB_PATH):

@@ -1,0 +1,21 @@
+# Production: single service (API + WebSockets + SPA).
+# DB is SQLite in a volume; optional env for CORS if frontend is elsewhere.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - POKER_DB_PATH=/data/poker_history.db
+      # Optional: if you put a reverse proxy in front or use a separate frontend URL
+      # - CORS_ORIGINS=https://your-domain.com
+    volumes:
+      - poker_data:/data
+    restart: unless-stopped
+
+volumes:
+  poker_data:

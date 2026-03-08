@@ -36,7 +36,7 @@ initTiers();
 
 function estimateRange(
   playerId: string,
-  gameState: GameStateData,
+  _gameState: GameStateData,
   actionLog: ActionEntry[],
 ): { pct: number; description: string } {
   const playerActions = actionLog.filter((a) => a.player_id === playerId);

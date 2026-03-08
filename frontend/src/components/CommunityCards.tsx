@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Card from "./Card";
 
 interface CommunityCardsProps {
@@ -6,13 +6,16 @@ interface CommunityCardsProps {
 }
 
 function CommunityCards({ cards }: CommunityCardsProps) {
-  const prevCountRef = useRef(0);
+  const [prevCount, setPrevCount] = useState(0);
 
   useEffect(() => {
-    prevCountRef.current = cards.length;
+    const n = cards.length;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setPrevCount(n);
+    });
+    return () => { cancelled = true; };
   }, [cards.length]);
-
-  const prevCount = prevCountRef.current;
   const slots = 5;
   const rendered = [];
 
