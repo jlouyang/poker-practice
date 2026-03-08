@@ -33,9 +33,17 @@ from app.api.ws import router as ws_router
 
 logger = logging.getLogger(__name__)
 
-_cors_origins = os.environ.get(
-    "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
-).split(",")
+def _cors_origins_list() -> list[str]:
+    origins = os.environ.get(
+        "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+    ).split(",")
+    # On Railway, allow the public app URL so the deployed frontend can call the API
+    public_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN") or os.environ.get("RAILWAY_STATIC_URL")
+    if public_domain:
+        base = public_domain if public_domain.startswith("http") else f"https://{public_domain}"
+        if base.rstrip("/") not in [o.strip() for o in origins if o]:
+            origins.append(base.rstrip("/"))
+    return [o.strip() for o in origins if o]
 
 
 def _configure_logging() -> None:
@@ -103,7 +111,7 @@ async def request_id_and_access_log(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=_cors_origins_list(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "X-Session-Token", "X-Request-ID"],
