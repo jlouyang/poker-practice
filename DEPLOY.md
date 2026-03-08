@@ -33,6 +33,8 @@ docker run -d -p 8000:8000 \
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Comma-separated origins; only needed if frontend is on another domain. |
 | `STATIC_DIR` | (auto) | Set in Dockerfile; override only if you serve static elsewhere. |
 | `ANTHROPIC_API_KEY` | — | Optional; enables LLM coach (Coach Claude). |
+| `LOG_JSON` | `0` | Set to `1` for JSON log lines (e.g. production / log aggregators). |
+| `LOG_LEVEL` | `INFO` | Logging level: DEBUG, INFO, WARNING, ERROR. |
 
 ## Hosting options
 
@@ -94,10 +96,10 @@ The repo includes `railway.toml` and a Dockerfile that uses Railway’s `PORT`. 
 - [ ] For the LLM coach, set `ANTHROPIC_API_KEY` in the host’s environment (never commit it).
 - [ ] For HTTPS, put the app behind a reverse proxy (Nginx/Caddy) or use the host’s TLS (Railway/Render/Fly provide it).
 
-## Health check
+## Health and metrics
 
-```bash
-curl http://localhost:8000/health
-```
+**Health:** `GET /health` → `{"status":"ok","version":"0.1.0","active_sessions":0}`.
 
-Returns `{"status":"ok","version":"0.1.0","active_sessions":0}`.
+**Metrics (light):** `GET /metrics` → JSON with `uptime_seconds`, `active_sessions`, `total_requests` (since boot). No Prometheus dependency; useful for dashboards or uptime checks.
+
+Every HTTP response includes an `X-Request-ID` header for log correlation; you can send the same header on retries to keep the same id.
