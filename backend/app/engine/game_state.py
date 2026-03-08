@@ -1,3 +1,13 @@
+"""Dataclasses representing the mutable state of a poker game.
+
+PlayerState  — per-player state (stack, hole cards, bet, flags)
+PlayerAction — a recorded action in the hand's history
+Pot          — a main or side pot with amount and eligible player IDs
+GameState    — full game state aggregating all of the above
+
+These are plain dataclasses with no game logic; GameEngine mutates them.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -80,3 +90,10 @@ class GameState:
         if not self.players:
             return 0
         return max(p.current_bet for p in self.players)
+
+    def get_player(self, player_id: str) -> PlayerState:
+        """Look up a player by ID. Raises ValueError if not found."""
+        for p in self.players:
+            if p.player_id == player_id:
+                return p
+        raise ValueError(f"Player {player_id} not found")

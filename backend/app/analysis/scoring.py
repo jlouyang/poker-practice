@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.analysis.equity import calculate_equity
+from app.analysis.equity import calculate_equity, calculate_equity_detailed
 from app.models.card import Card
-from app.models.types import ActionType, Street
+from app.models.types import ActionType
 
 
 def _pct(v: float) -> int:
@@ -19,13 +19,20 @@ def score_decision(
     pot_before_action: int,
     to_call: int,
     num_opponents: int,
+    include_details: bool = False,
 ) -> dict:
     """Score a single decision.
 
     Returns dict with equity, optimal_action suggestion, score label,
-    reasoning, and recommendation.
+    reasoning, and recommendation. If include_details is True, adds
+    a full Monte Carlo breakdown under 'equity_details'.
     """
-    equity = calculate_equity(hole_cards, community_cards, num_opponents, num_simulations=1000)
+    if include_details:
+        eq_data = calculate_equity_detailed(hole_cards, community_cards, num_opponents, num_simulations=1000)
+        equity = eq_data["equity"]
+    else:
+        equity = calculate_equity(hole_cards, community_cards, num_opponents, num_simulations=1000)
+        eq_data = None
 
     pot_odds = to_call / max(pot_before_action + to_call, 1) if to_call > 0 else 0.0
 
@@ -48,7 +55,7 @@ def score_decision(
     reasoning = _build_reasoning(action_type, optimal, score, equity, pot_odds, to_call, pot_before_action)
     recommendation = _build_recommendation(optimal, equity, pot_odds, to_call)
 
-    return {
+    result = {
         "equity": round(equity, 3),
         "pot_odds": round(pot_odds, 3),
         "optimal_action": optimal,
@@ -56,6 +63,25 @@ def score_decision(
         "reasoning": reasoning,
         "recommendation": recommendation,
     }
+
+    if include_details and eq_data:
+        decision_steps = _build_decision_steps(equity, pot_odds, to_call, optimal)
+        result["equity_details"] = {
+            "simulations": eq_data["simulations"],
+            "wins": eq_data["wins"],
+            "ties": eq_data["ties"],
+            "losses": eq_data["losses"],
+            "current_hand": eq_data["current_hand"],
+            "hand_distribution": eq_data["hand_distribution"],
+            "hole_cards": [str(c) for c in hole_cards],
+            "community_cards": [str(c) for c in community_cards],
+            "num_opponents": num_opponents,
+            "pot": pot_before_action,
+            "to_call": to_call,
+            "decision_steps": decision_steps,
+        }
+
+    return result
 
 
 def _compute_score(
@@ -187,6 +213,36 @@ def _build_recommendation(
             return f"Check and consider folding to a bet. At {eq}% equity, your hand is weak."
         return f"Check to control the pot. At {eq}% equity, there's no need to bloat the pot."
     return f"The optimal play was to {optimal}."
+
+
+def _build_decision_steps(equity: float, pot_odds: float, to_call: int, optimal: str) -> list[str]:
+    """Build a step-by-step explanation of the decision logic."""
+    eq = _pct(equity)
+    po = _pct(pot_odds)
+    steps = []
+
+    steps.append(f"Equity = {eq}% (from Monte Carlo simulation of 1,000 random runouts)")
+
+    if to_call > 0:
+        steps.append(f"Pot odds = to_call / (pot + to_call) = {po}%")
+        steps.append(f"Compare: equity ({eq}%) vs pot odds ({po}%)")
+        if equity > pot_odds + 0.15:
+            steps.append("Equity exceeds pot odds by >15% → raise for value")
+        elif equity > pot_odds - 0.05:
+            steps.append("Equity is close to pot odds (within 5%) → call is profitable")
+        else:
+            steps.append("Equity is below pot odds → fold to avoid losing chips long-term")
+    else:
+        steps.append("No bet to call (can check for free)")
+        if equity > 0.65:
+            steps.append(f"Equity ({eq}%) > 65% → bet to build the pot with a strong hand")
+        elif equity > 0.3:
+            steps.append(f"Equity ({eq}%) is moderate (30-65%) → check to control pot size")
+        else:
+            steps.append(f"Equity ({eq}%) < 30% → check with a weak hand")
+
+    steps.append(f"Optimal action: {optimal}")
+    return steps
 
 
 def analyze_hand(

@@ -1,7 +1,7 @@
 """Comprehensive tests for card primitives and hand evaluation."""
 
 from app.models.card import Card, Deck
-from app.models.hand import evaluate_hand, compare_hands, HandResult
+from app.models.hand import compare_hands, evaluate_hand
 from app.models.types import HandRanking, Rank, Suit
 
 
@@ -27,7 +27,7 @@ class TestCard:
         card = Card.from_str("Ah")
         try:
             card.rank = Rank.KING  # type: ignore
-            assert False, "Should raise"
+            raise AssertionError("Should have raised AttributeError")
         except AttributeError:
             pass
 
@@ -149,7 +149,7 @@ class TestCompareHands:
     def test_single_winner(self):
         hands = [
             (cards("Ah Kh"), cards("Qh Jh Th")),  # Royal flush
-            (cards("2c 7d"), cards("Qh Jh Th")),   # Pair (7s dont help)
+            (cards("2c 7d"), cards("Qh Jh Th")),  # Pair (7s dont help)
         ]
         groups = compare_hands(hands)
         assert groups[0] == [0]

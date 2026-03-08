@@ -1,13 +1,25 @@
+"""Bot profile definitions and the preset bot roster.
+
+BotProfile  — immutable config (name, tier, tightness, aggression, description).
+              Its create_bot() factory method dispatches to the correct tier class.
+
+PRESET_PROFILES — dictionary of all built-in bot profiles, keyed by slug.
+                  Used by the session manager to populate tables based on difficulty.
+
+Profiles are selected at game creation time via _pick_bots_for_difficulty()
+in session.py, which uses weighted random sampling across tiers.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from app.bots.fish import FishBot
+from app.bots.gto import GTOBot
 from app.bots.interface import BotStrategy
+from app.bots.llm_coach import LLMCoachBot
 from app.bots.regular import RegularBot
 from app.bots.shark import SharkBot
-from app.bots.gto import GTOBot
-from app.bots.llm_coach import LLMCoachBot
 
 
 @dataclass(frozen=True)

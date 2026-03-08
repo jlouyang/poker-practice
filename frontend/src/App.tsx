@@ -1,4 +1,15 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+/**
+ * Root application component.
+ *
+ * Phases:
+ *   "setup"   — SetupScreen (configure table and start)
+ *   "playing" — Table + ActionPanel + modals (review, dashboard, coach, etc.)
+ *
+ * All game state lives in the useGameSocket hook. This component handles:
+ *   - Rendering the appropriate phase UI
+ *   - Toast notifications for errors
+ */
+import { useState, useCallback, useEffect, useRef } from "react";
 import SetupScreen from "./components/SetupScreen";
 import Table from "./components/Table";
 import ActionPanel from "./components/ActionPanel";
@@ -6,363 +17,383 @@ import HandReview from "./components/HandReview";
 import HandReplayer from "./components/HandReplayer";
 import SessionDashboard from "./components/SessionDashboard";
 import CoachChat from "./components/CoachChat";
-import type {
-  CreateGameRequest,
-  GameStateData,
-  LegalAction,
-  WsMessage,
-  GamePhase,
-  HandResult,
-} from "./types";
+import Modal from "./components/Modal";
+import ToastContainer, { type ToastMessage } from "./components/Toast";
+import HandResultBar from "./components/HandResultBar";
+import HintPanel from "./components/HintPanel";
+import TrainingTools, { type TrainingToolsState } from "./components/TrainingTools";
+import PreflopChart, { type Position } from "./components/PreflopChart";
+import PotOddsDisplay from "./components/PotOddsDisplay";
+import HandStrengthMeter from "./components/HandStrengthMeter";
+import RangeVisualization, { type ActionEntry } from "./components/RangeVisualization";
+import { useGameSocket, type ToastEmitter } from "./hooks/useGameSocket";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { soundManager } from "./audio/SoundManager";
+import type { PlayerInfo } from "./types";
 import "./App.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_URL = API_URL.replace(/^http/, "ws");
+const TRAINING_TOOLS_KEY = "poker-training-tools";
 
-interface AnalysisResult {
-  player_id: string;
-  street: string;
-  equity: number;
-  pot_odds?: number;
-  score: string;
-  optimal_action?: string;
-  action_type?: string;
-  amount?: number;
-  reasoning?: string;
-  recommendation?: string;
+function loadTrainingTools(): TrainingToolsState {
+  try {
+    const stored = localStorage.getItem(TRAINING_TOOLS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* use defaults */ }
+  return { preflopChart: false, positionGuide: false, potOdds: false, handStrength: false, sizingTips: false, rangeViz: false };
 }
 
-function App() {
-  const [phase, setPhase] = useState<GamePhase>("setup");
-  const [gameState, setGameState] = useState<GameStateData | null>(null);
-  const [legalActions, setLegalActions] = useState<LegalAction[]>([]);
-  const [isMyTurn, setIsMyTurn] = useState(false);
-  const [handResult, setHandResult] = useState<HandResult | null>(null);
-  const [bigBlind, setBigBlind] = useState(10);
-  const [analysis, setAnalysis] = useState<AnalysisResult[] | null>(null);
-  const [showReview, setShowReview] = useState(false);
-  const [playerStats, setPlayerStats] = useState<Record<string, any>>({});
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [replayData, setReplayData] = useState<any>(null);
-  const [showCoach, setShowCoach] = useState(false);
-  const [gameId, setGameId] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+function computeHumanPosition(
+  players: PlayerInfo[],
+  dealerSeat: number,
+): Position | null {
+  const activeSeats = players.filter((p) => p.is_active || p.stack > 0).map((p) => p.seat).sort((a, b) => a - b);
+  const n = activeSeats.length;
+  if (n < 2) return null;
 
-  const handleStart = useCallback(async (config: CreateGameRequest) => {
-    setBigBlind(config.big_blind);
-
-    const res = await fetch(`${API_URL}/game/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
-    });
-    const data = await res.json();
-    setGameId(data.game_id);
-    setPhase("playing");
-
-    const ws = new WebSocket(`${WS_URL}/game/${data.game_id}/ws`);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const msg: WsMessage = JSON.parse(event.data);
-      handleWsMessage(msg);
-    };
-
-    ws.onclose = () => {
-      console.log("WebSocket closed");
-    };
-  }, []);
-
-  const handleWsMessage = useCallback((msg: WsMessage) => {
-    const { type, data } = msg;
-
-    if (!data || !data.players) {
-      if (type === "game_over") {
-        setPhase("setup");
-      }
-      return;
+  const nextActive = (from: number): number => {
+    for (let i = 1; i <= players.length; i++) {
+      const s = (from + i) % players.length;
+      if (activeSeats.includes(s)) return s;
     }
+    return -1;
+  };
 
-    switch (type) {
-      case "new_hand":
-        setHandResult(null);
-        setAnalysis(null);
-        setShowReview(false);
-        setGameState(data);
-        setIsMyTurn(false);
-        setLegalActions([]);
-        break;
-
-      case "action_required":
-        setGameState(data);
-        setLegalActions(data.legal_actions || []);
-        setIsMyTurn(true);
-        break;
-
-      case "state_update":
-      case "bot_action":
-        setGameState(data);
-        setIsMyTurn(false);
-        setLegalActions([]);
-        if ((data as any).player_stats) setPlayerStats((data as any).player_stats);
-        break;
-
-      case "hand_complete":
-        setGameState(data);
-        setHandResult(data.result || null);
-        setAnalysis((data as any).analysis || null);
-        if ((data as any).player_stats) setPlayerStats((data as any).player_stats);
-        setIsMyTurn(false);
-        setLegalActions([]);
-        break;
-
-      case "game_over":
-        setPhase("setup");
-        break;
-    }
-  }, []);
-
-  const handleAction = useCallback(
-    (action: string, amount: number) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: "action", action, amount }));
-        setIsMyTurn(false);
-        setLegalActions([]);
-      }
-    },
-    []
-  );
-
-  const handleNextHand = useCallback(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "continue" }));
-      setHandResult(null);
-      setAnalysis(null);
-      setShowReview(false);
-    }
-  }, []);
-
-  const loadReplay = useCallback(async (handId: number) => {
-    try {
-      const res = await fetch(`${API_URL}/hand/${handId}/replay`);
-      if (res.ok) {
-        const data = await res.json();
-        setReplayData(data);
-        setShowDashboard(false);
-      }
-    } catch (e) {
-      console.error("Failed to load replay", e);
-    }
-  }, []);
-
-  // Keyboard shortcuts: F=fold, C=call/check, R=raise, Space/N=next hand
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-
-      if (handResult && (key === " " || key === "n") && !showReview) {
-        e.preventDefault();
-        handleNextHand();
-        return;
-      }
-
-      if (!isMyTurn || showReview) return;
-      const types = new Set(legalActions.map((a) => a.action_type));
-
-      if (key === "f" && types.has("fold")) {
-        handleAction("fold", 0);
-      } else if (key === "c") {
-        if (types.has("call")) {
-          const callAction = legalActions.find((a) => a.action_type === "call");
-          handleAction("call", callAction?.min_amount ?? 0);
-        } else if (types.has("check")) {
-          handleAction("check", 0);
-        }
-      } else if (key === "r") {
-        const ra = legalActions.find(
-          (a) => a.action_type === "raise" || a.action_type === "bet"
-        );
-        if (ra) handleAction(ra.action_type, ra.min_amount);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isMyTurn, legalActions, handleAction, handleNextHand, handResult, showReview]);
-
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
-
-  if (phase === "setup") {
-    return <SetupScreen onStart={handleStart} />;
+  const ordered: number[] = [];
+  let current = dealerSeat;
+  for (let i = 0; i < n; i++) {
+    if (i === 0) ordered.push(current);
+    else { current = nextActive(current); ordered.push(current); }
   }
 
-  if (!gameState) {
+  const human = players.find((p) => p.is_human);
+  if (!human) return null;
+  const humanIdx = ordered.indexOf(human.seat);
+  if (humanIdx === -1) return null;
+
+  if (n <= 3) {
+    const names: Position[] = n === 2 ? ["BTN", "BB"] : ["BTN", "SB", "BB"];
+    return names[humanIdx] ?? null;
+  }
+
+  if (humanIdx === 0) return "BTN";
+  if (humanIdx === 1) return "SB";
+  if (humanIdx === 2) return "BB";
+
+  const remaining = n - 3;
+  const posInRemaining = humanIdx - 3;
+  if (remaining <= 1) return "UTG";
+  if (remaining <= 2) return posInRemaining === 0 ? "UTG" : "CO";
+  if (remaining <= 3) return (["UTG", "MP", "CO"] as Position[])[posInRemaining] ?? "MP";
+  if (remaining <= 4) return (["UTG", "MP", "MP", "CO"] as Position[])[posInRemaining] ?? "MP";
+  return (["UTG", "UTG", "MP", "MP", "CO"] as Position[])[posInRemaining] ?? "MP";
+}
+
+const LEGEND_ITEMS = [
+  ["VPIP", "Voluntarily Put $ In Pot", "% of hands a player voluntarily puts money in preflop (excludes posting blinds)"],
+  ["PFR", "Preflop Raise", "% of hands a player raises preflop — a subset of VPIP"],
+  ["AF", "Aggression Factor", "Ratio of (bets + raises) to calls — higher means more aggressive"],
+  ["BB", "Big Blind", "The larger of the two forced bets, used as a unit of measurement"],
+  ["SB", "Small Blind", "The smaller forced bet, typically half of the big blind"],
+  ["Pot Odds", "Pot Odds", "The ratio of the current pot to the cost of a call, expressed as %"],
+  ["Equity", "Hand Equity", "Your estimated chance of winning the hand at showdown"],
+] as const;
+
+let toastId = 0;
+
+function App() {
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [trainingTools, setTrainingTools] = useState<TrainingToolsState>(loadTrainingTools);
+  const [showPreflopChart, setShowPreflopChart] = useState(false);
+  const [showRangeViz, setShowRangeViz] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(soundManager.enabled);
+  const actionLogRef = useRef<ActionEntry[]>([]);
+
+  const toggleTool = useCallback((key: keyof TrainingToolsState) => {
+    setTrainingTools((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem(TRAINING_TOOLS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const toast = useRef<ToastEmitter>({
+    error: (text: string) => setToasts((prev) => [...prev, { id: ++toastId, text, type: "error" }]),
+    info: (text: string) => setToasts((prev) => [...prev, { id: ++toastId, text, type: "info" }]),
+  }).current;
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const {
+    state: g,
+    startGame,
+    sendAction,
+    nextHand,
+    fetchHint,
+    fetchHandStrength,
+    dismissHint,
+    loadReplay,
+    closeReplay,
+    exitGame,
+    toggle,
+    wsRef,
+    sessionTokenRef,
+  } = useGameSocket(toast);
+
+  const toggleSound = useCallback(() => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    soundManager.setEnabled(next);
+  }, [soundEnabled]);
+
+  // Track actions for range visualization
+  const prevStreetRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!g.gameState) return;
+    const gs = g.gameState;
+
+    // Reset on new hand
+    const lastAction = (gs as Record<string, unknown>).last_action as
+      | { player_id?: string; action?: string; amount?: number } | undefined;
+    if (lastAction?.player_id && lastAction.action) {
+      actionLogRef.current.push({
+        player_id: lastAction.player_id,
+        action: lastAction.action,
+        amount: lastAction.amount ?? 0,
+        street: gs.street,
+      });
+    }
+    prevStreetRef.current = `${gs.hand_number}:${gs.street}`;
+  }, [g.gameState]);
+
+  // Clear action log on new hand
+  useEffect(() => {
+    if (g.gameState?.hand_number) {
+      actionLogRef.current = [];
+    }
+  }, [g.gameState?.hand_number]);
+
+  useKeyboardShortcuts({
+    isMyTurn: g.isMyTurn,
+    legalActions: g.legalActions,
+    handResult: g.handResult,
+    showReview: g.showReview,
+    sendAction,
+    nextHand,
+  });
+
+  useEffect(() => {
+    if (g.isMyTurn && trainingTools.handStrength && !g.handStrength) {
+      fetchHandStrength();
+    }
+  }, [g.isMyTurn, trainingTools.handStrength, g.handStrength, fetchHandStrength]);
+
+  useEffect(() => () => { wsRef.current?.close(); }, [wsRef]);
+
+  if (g.phase === "setup") {
+    return (
+      <>
+        <SetupScreen onStart={startGame} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </>
+    );
+  }
+
+  if (!g.gameState) {
     return (
       <div className="app">
-        <p>Connecting...</p>
+        <p style={{ color: "var(--text-muted)" }}>Connecting...</p>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </div>
     );
   }
 
   return (
     <div className="app">
-      <Table
-        players={gameState.players}
-        communityCards={gameState.community_cards}
-        pot={gameState.pot}
-        dealerSeat={gameState.dealer_seat}
-        currentPlayerId={gameState.current_player_id}
-        street={gameState.street}
-        handNumber={gameState.hand_number}
-        playerStats={playerStats}
-      />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-      {handResult && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "16px 24px",
-            background: "rgba(46, 204, 113, 0.1)",
-            borderRadius: 10,
-            margin: "8px auto",
-            maxWidth: 600,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 16,
-          }}
-        >
-          <div>
-            {handResult.winners &&
-              Object.entries(handResult.winners).map(([pid, info]) => (
-                <div key={pid} style={{ color: "#2ecc71", fontWeight: 600 }}>
-                  {pid === "human" ? "You" : pid} wins {info.amount} with{" "}
-                  {info.hand}
-                </div>
-              ))}
-            {handResult.player_id && (
-              <div style={{ color: "#2ecc71", fontWeight: 600 }}>
-                {handResult.player_id === "human" ? "You" : handResult.player_id}{" "}
-                wins {handResult.amount} (opponents folded)
-              </div>
-            )}
-          </div>
-          {analysis && analysis.length > 0 && (
-            <button
-              onClick={() => setShowReview(true)}
-              style={{
-                padding: "6px 16px",
-                borderRadius: 8,
-                border: "1px solid #4ecca3",
-                background: "transparent",
-                color: "#4ecca3",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              Review Hand
+      {/* ── Header ── */}
+      {g.gameId && (
+        <div className="app-header">
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button className="btn btn-outline" style={{ color: "var(--accent)" }} onClick={() => toggle("showDashboard", true)}>
+              Dashboard
             </button>
-          )}
-          <button
-            onClick={handleNextHand}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg, #4ecca3, #36b58e)",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(78, 204, 163, 0.3)",
-            }}
-          >
-            Next Hand
-          </button>
+            <button
+              className="btn btn-outline"
+              style={{ color: "var(--color-warning)", borderColor: "rgba(241, 196, 15, 0.4)", fontSize: 13 }}
+              onClick={() => setShowPreflopChart(true)}
+            >
+              📊 Hand Chart
+            </button>
+            <TrainingTools tools={trainingTools} onToggle={toggleTool} />
+            {trainingTools.rangeViz && (
+              <button
+                className="btn btn-outline"
+                style={{ color: "var(--color-danger)", borderColor: "rgba(231, 76, 60, 0.4)", fontSize: 13 }}
+                onClick={() => setShowRangeViz(true)}
+              >
+                🎯 Ranges
+              </button>
+            )}
+            <button className="btn btn-outline" style={{ color: "var(--color-danger)", borderColor: "var(--color-danger-dark)" }} onClick={exitGame}>
+              Exit
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              className="btn btn-outline"
+              style={{
+                width: 32, height: 32, borderRadius: "var(--radius-full)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: soundEnabled ? "var(--accent)" : "var(--text-dim)",
+                fontSize: 16, fontWeight: 700,
+              }}
+              onClick={toggleSound}
+              aria-label={soundEnabled ? "Mute sounds" : "Unmute sounds"}
+              title={soundEnabled ? "Sound on" : "Sound off"}
+            >
+              {soundEnabled ? "🔊" : "🔇"}
+            </button>
+            <button
+              className="btn btn-outline"
+              style={{ width: 32, height: 32, borderRadius: "var(--radius-full)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)", fontSize: 16, fontWeight: 700 }}
+              onClick={() => toggle("showLegend")}
+              aria-label="Show abbreviation legend"
+            >
+              ?
+            </button>
+          </div>
         </div>
       )}
 
-      <ActionPanel
-        legalActions={legalActions}
-        onAction={handleAction}
-        disabled={!isMyTurn}
-        potSize={gameState.pot}
-        bigBlind={bigBlind}
-        myCurrentBet={gameState.players.find((p) => p.is_human)?.current_bet ?? 0}
-      />
+      {/* ── Table ── */}
+      <div className="app-table">
+        <Table
+          players={g.gameState.players}
+          communityCards={g.gameState.community_cards}
+          pot={g.gameState.pot}
+          dealerSeat={g.gameState.dealer_seat}
+          currentPlayerId={g.gameState.current_player_id}
+          street={g.gameState.street}
+          handNumber={g.gameState.hand_number}
+          playerStats={g.playerStats}
+          showPositionGuide={trainingTools.positionGuide}
+        />
+      </div>
 
-      {gameId && (
-        <button
-          onClick={() => setShowDashboard(true)}
-          style={{
-            position: "fixed",
-            top: 16,
-            left: 16,
-            padding: "6px 14px",
-            borderRadius: 8,
-            border: "1px solid #4a6785",
-            background: "rgba(0,0,0,0.5)",
-            color: "#4ecca3",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            zIndex: 10,
-          }}
-        >
-          Dashboard
-        </button>
+      {/* ── Controls ── */}
+      <div className="app-controls">
+        {g.handResult && (
+          <HandResultBar
+            handResult={g.handResult}
+            analysis={g.analysis}
+            onReviewHand={() => toggle("showReview", true)}
+            onNextHand={nextHand}
+          />
+        )}
+
+        {g.isMyTurn && g.hint && (
+          <HintPanel
+            hint={g.hint}
+            showCalc={g.showHintCalc}
+            onToggleCalc={() => toggle("showHintCalc")}
+            onClose={dismissHint}
+          />
+        )}
+
+        {g.isMyTurn && (trainingTools.potOdds || trainingTools.handStrength) && (
+          <div className="training-tools-bar">
+            {trainingTools.potOdds && (
+              <PotOddsDisplay
+                potSize={g.gameState.pot}
+                legalActions={g.legalActions}
+                equity={g.hint?.equity ?? null}
+              />
+            )}
+            {trainingTools.handStrength && g.handStrength && (
+              <HandStrengthMeter data={g.handStrength} />
+            )}
+          </div>
+        )}
+
+        <ActionPanel
+          legalActions={g.legalActions}
+          onAction={sendAction}
+          disabled={!g.isMyTurn}
+          potSize={g.gameState.pot}
+          bigBlind={g.bigBlind}
+          myCurrentBet={g.gameState.players.find((p) => p.is_human)?.current_bet ?? 0}
+          onHint={fetchHint}
+          hintLoading={g.hintLoading}
+          showHint={!!g.hint}
+          showSizingTips={trainingTools.sizingTips}
+        />
+      </div>
+
+      {/* ── Modals ── */}
+      <Modal open={g.showLegend} onClose={() => toggle("showLegend", false)} title="Abbreviation Legend" maxWidth={380} titleId="legend-title">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {LEGEND_ITEMS.map(([abbr, full, desc]) => (
+            <div key={abbr} style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: 8 }}>
+              <div>
+                <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13 }}>{abbr}</span>
+                <span style={{ color: "var(--text-subtle)", fontSize: 12, marginLeft: 8 }}>{full}</span>
+              </div>
+              <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {g.showReview && g.analysis && (
+        <HandReview analysis={g.analysis} onClose={() => toggle("showReview", false)} />
       )}
 
-      {showReview && analysis && (
-        <HandReview analysis={analysis} onClose={() => setShowReview(false)} />
-      )}
-
-      {showDashboard && gameId && (
+      {g.showDashboard && g.gameId && (
         <SessionDashboard
-          sessionId={gameId}
-          onClose={() => setShowDashboard(false)}
+          sessionId={g.gameId}
+          sessionToken={sessionTokenRef.current}
+          onClose={() => toggle("showDashboard", false)}
           onReplayHand={loadReplay}
         />
       )}
 
-      {replayData && (
-        <HandReplayer
-          handData={replayData}
-          onClose={() => setReplayData(null)}
+      {g.replayData && (
+        <HandReplayer handData={g.replayData} onClose={closeReplay} />
+      )}
+
+      {showRangeViz && g.gameState && (
+        <RangeVisualization
+          open={showRangeViz}
+          onClose={() => setShowRangeViz(false)}
+          gameState={g.gameState}
+          actionLog={actionLogRef.current}
         />
       )}
 
-      {gameId && handResult && (
+      {showPreflopChart && (
+        <PreflopChart
+          open={showPreflopChart}
+          onClose={() => setShowPreflopChart(false)}
+          holeCards={g.gameState?.players.find((p) => p.is_human)?.hole_cards}
+          playerPosition={g.gameState ? computeHumanPosition(g.gameState.players, g.gameState.dealer_seat) : null}
+        />
+      )}
+
+      {g.gameId && g.handResult && (
         <button
-          onClick={() => setShowCoach((v) => !v)}
-          style={{
-            position: "fixed",
-            bottom: 16,
-            right: showCoach ? 380 : 16,
-            padding: "8px 16px",
-            borderRadius: 20,
-            border: "none",
-            background: "#4ecca3",
-            color: "#fff",
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: "pointer",
-            boxShadow: "0 2px 10px rgba(78,204,163,0.3)",
-            zIndex: 91,
-          }}
+          onClick={() => toggle("showCoach")}
+          className="coach-toggle-btn"
+          style={{ right: g.showCoach ? 380 : 16 }}
         >
-          {showCoach ? "Hide Coach" : "Ask Coach"}
+          {g.showCoach ? "Hide Coach" : "Ask Coach"}
         </button>
       )}
 
-      {showCoach && gameId && (
-        <CoachChat gameId={gameId} onClose={() => setShowCoach(false)} />
+      {g.showCoach && g.gameId && (
+        <CoachChat gameId={g.gameId} sessionToken={sessionTokenRef.current} onClose={() => toggle("showCoach", false)} />
       )}
     </div>
   );

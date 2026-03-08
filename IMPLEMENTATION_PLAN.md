@@ -57,10 +57,13 @@ poker-practice/
 │   │   │   ├── models.py      # SQLAlchemy models
 │   │   │   └── repository.py  # CRUD operations
 │   │   └── main.py            # FastAPI app entry point
-│   ├── tests/                 # 56 passing tests
+│   ├── tests/                 # 138 passing tests
 │   │   ├── test_hand_eval.py  # 29 tests: card, deck, hand evaluation
 │   │   ├── test_game_engine.py # 20 tests: betting, pots, showdown
-│   │   └── test_bots.py       # 7 tests: bot legality, 100-hand stress test
+│   │   ├── test_bots.py       # 7 tests: bot legality, 100-hand stress test
+│   │   ├── test_analysis.py   # Analysis, equity, scoring, EV tests
+│   │   ├── test_advanced_bots.py # Shark, GTO, LLM coach bot tests
+│   │   └── test_edge_cases.py # Card parsing, pot logic, engine edge cases
 │   ├── pyproject.toml
 │   └── Dockerfile
 ├── frontend/                   # React 18 + TypeScript + Vite
@@ -77,14 +80,23 @@ poker-practice/
 │   │   │   ├── HandReplayer.tsx # Step-through replay
 │   │   │   ├── SessionDashboard.tsx # Aggregate session stats
 │   │   │   ├── HUD.tsx        # Per-player VPIP/PFR/AF overlay
-│   │   │   └── CoachChat.tsx  # Post-hand Q&A with AI coach
-│   │   ├── types.ts           # TypeScript type definitions
-│   │   ├── App.tsx            # Main app with WebSocket integration
-│   │   └── App.css
+│   │   │   ├── CoachChat.tsx  # Post-hand Q&A with AI coach
+│   │   │   ├── Modal.tsx      # Accessible dialog (focus trap, Escape, aria)
+│   │   │   ├── Toast.tsx      # Error/info toast notifications
+│   │   │   ├── EquityBreakdown.tsx # Monte Carlo equity display
+│   │   │   └── ChipStack.tsx  # Visual chip stack decomposition
+│   │   ├── hooks/
+│   │   │   └── useGameSocket.ts # Central state + WS hook (useReducer)
+│   │   ├── types.ts           # Shared TypeScript type definitions
+│   │   ├── App.tsx            # Root component (keyboard shortcuts, layout)
+│   │   ├── App.css            # App-level styles
+│   │   └── index.css          # CSS design system (custom properties)
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
-└── IMPLEMENTATION_PLAN.md      # This file
+├── README.md                   # Quick start and overview
+├── ARCHITECTURE.md             # Detailed architecture, data flows, protocols
+└── IMPLEMENTATION_PLAN.md      # This file (build phases and reference)
 
 ```
 
@@ -130,8 +142,9 @@ pytest tests/ -v
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` | Health check (includes active session count) |
 | POST | `/game/create` | Create new game session |
+| GET | `/game/{id}/hint` | Get equity-based action recommendation |
 | GET | `/profiles` | List available bot profiles |
 | WS | `/game/{id}/ws` | WebSocket game channel |
 | GET | `/hand/{id}/analysis` | Get hand analysis results |
@@ -168,6 +181,7 @@ pytest tests/ -v
 | F | Fold |
 | C | Call / Check |
 | R | Raise (minimum) |
+| Space / N | Next hand (after hand completes) |
 
 ---
 

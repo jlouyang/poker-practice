@@ -1,3 +1,15 @@
+"""Legal action computation and validation for No-Limit Hold'em.
+
+get_legal_actions() — returns the set of actions available to a player
+                      given the current bet, their stack, and min-raise rules.
+validate_action()   — checks that a specific (action_type, amount) pair is
+                      legal, returning (is_valid, error_message).
+
+Encodes NLHE rules: must call or fold facing a bet, can't raise less than
+the last raise size (or big blind), all-in replaces actions when stack is
+insufficient, etc.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

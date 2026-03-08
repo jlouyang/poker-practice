@@ -6,9 +6,249 @@
   padding: 0;
 }
 
+:root {
+  /* Colors — Surfaces */
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-surface: rgba(255, 255, 255, 0.03);
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --bg-header: rgba(0, 0, 0, 0.3);
+
+  /* Colors — Borders */
+  --border-default: #2c3e50;
+  --border-subtle: #2a3a4a;
+  --border-input: #4a6785;
+
+  /* Colors — Accents */
+  --accent: #4ecca3;
+  --accent-hover: #36b58e;
+  --accent-glow: rgba(78, 204, 163, 0.3);
+
+  /* Colors — Semantic */
+  --color-success: #2ecc71;
+  --color-success-dark: #27ae60;
+  --color-warning: #f39c12;
+  --color-danger: #e74c3c;
+  --color-danger-dark: #c0392b;
+  --color-info: #3498db;
+  --color-info-dark: #2980b9;
+  --color-gold: #f1c40f;
+  --color-orange: #e67e22;
+  --color-purple: #8e44ad;
+
+  /* Colors — Text */
+  --text-primary: #e0e0e0;
+  --text-light: #ccc;
+  --text-secondary: #aaa;
+  --text-muted: #888;
+  --text-dim: #666;
+  --text-subtle: #8899aa;
+
+  /* Colors — Misc */
+  --bg-disabled: #333;
+
+  /* Typography */
+  --font-family: system-ui, -apple-system, sans-serif;
+  --font-mono: monospace;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 50%;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Z-Index */
+  --z-base: 1;
+  --z-chip: 4;
+  --z-bet: 5;
+  --z-hud: 20;
+  --z-coach: 90;
+  --z-coach-toggle: 91;
+  --z-modal: 100;
+  --z-toast: 200;
+}
+
 body {
-  background: #1a1a2e;
-  color: #e0e0e0;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── Reusable components ── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.modal-panel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-2xl);
+  max-width: 600px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  color: var(--accent);
+  margin: 0;
+  font-size: 20px;
+}
+
+.btn {
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-primary {
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.btn-outline {
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-input);
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: none;
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-close:hover {
+  border-color: var(--text-muted);
+}
+
+.section-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.surface {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Toast notifications ── */
+
+.toast-container {
+  position: fixed;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.toast {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: auto;
+  animation: toast-in 0.3s ease-out;
+  max-width: 380px;
+}
+
+.toast-error {
+  background: rgba(231, 76, 60, 0.9);
+  color: #fff;
+  border: 1px solid var(--color-danger);
+}
+
+.toast-info {
+  background: rgba(52, 152, 219, 0.9);
+  color: #fff;
+  border: 1px solid var(--color-info);
+}
+
+@keyframes toast-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Card & game animations ── */
+
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chip-slide {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(46, 204, 113, 0); }
+}
+
+@keyframes win-flash {
+  0% { background: rgba(46, 204, 113, 0.1); }
+  50% { background: rgba(46, 204, 113, 0.25); }
+  100% { background: rgba(46, 204, 113, 0.1); }
 }

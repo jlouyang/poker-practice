@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import TypedDict
+
+
+class ActionRecord(TypedDict):
+    player_id: str
+    action_type: str
 
 
 @dataclass
@@ -10,10 +16,9 @@ class PlayerStats:
     player_id: str
     hands_played: int = 0
     vpip_hands: int = 0  # Voluntarily put $ in pot (preflop, excluding blinds)
-    pfr_hands: int = 0   # Preflop raise
+    pfr_hands: int = 0  # Preflop raise
     total_bets_raises: int = 0
     total_calls: int = 0
-    total_folds: int = 0
     pots_won: int = 0
     total_winnings: int = 0
 
@@ -61,8 +66,8 @@ class SessionStatsTracker:
     def record_hand(
         self,
         player_ids: list[str],
-        preflop_actions: list[dict],
-        all_actions: list[dict],
+        preflop_actions: list[ActionRecord],
+        all_actions: list[ActionRecord],
         winner_ids: list[str],
         winnings: dict[str, int],
     ) -> None:
@@ -91,8 +96,6 @@ class SessionStatsTracker:
                 stats.total_bets_raises += 1
             elif action == "call":
                 stats.total_calls += 1
-            elif action == "fold":
-                stats.total_folds += 1
 
         for pid in winner_ids:
             stats = self.get_stats(pid)

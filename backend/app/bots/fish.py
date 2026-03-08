@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from app.bots.interface import BotAction, BotStrategy
+from app.bots.interface import BotAction, BotStrategy, snap_to_bb
 from app.bots.visible_state import VisibleGameState
 from app.models.types import ActionType
 
@@ -30,31 +30,29 @@ class FishBot(BotStrategy):
         return self._decide_facing_bet(state)
 
     def _decide_no_bet(self, state: VisibleGameState) -> BotAction:
-        # Fish mostly checks, occasionally bets small
+        bb = state.big_blind
         if random.random() * 100 < self._aggression:
-            bet_size = max(state.big_blind, state.pot_total // 4)
+            bet_size = snap_to_bb(max(bb, state.pot_total // 4), bb, bb)
             bet_size = min(bet_size, state.my_stack)
             if bet_size > 0:
                 return BotAction(ActionType.BET, bet_size)
         return BotAction(ActionType.CHECK)
 
     def _decide_facing_bet(self, state: VisibleGameState) -> BotAction:
+        bb = state.big_blind
         to_call = state.to_call
 
         if to_call > state.my_stack:
-            # Decide whether to go all-in or fold
             if random.random() * 100 > self._tightness:
                 return BotAction(ActionType.ALL_IN, state.my_stack)
             return BotAction(ActionType.FOLD)
 
-        # Fish calls way too often -- fold probability is low, tied to tightness
         fold_chance = self._tightness * 0.4
         if random.random() * 100 < fold_chance:
             return BotAction(ActionType.FOLD)
 
-        # Rarely raise
         if random.random() * 100 < self._aggression * 0.3:
-            raise_amount = to_call + max(state.big_blind, state.pot_total // 4)
+            raise_amount = snap_to_bb(to_call + max(bb, state.pot_total // 4), bb, to_call + bb)
             raise_amount = min(raise_amount, state.my_stack)
             return BotAction(ActionType.RAISE, raise_amount)
 

@@ -1,9 +1,17 @@
-import React from "react";
+/**
+ * Playing card component — renders a face-up card or face-down back.
+ *
+ * Parses the card string (e.g., "Ah" → Ace of Hearts) and displays the
+ * rank and suit symbol in the appropriate color. Supports small and
+ * standard sizes for use in player seats vs. community cards.
+ */
+import type { CSSProperties } from "react";
 
 interface CardProps {
   card?: string;
   faceDown?: boolean;
   small?: boolean;
+  animationDelay?: number;
 }
 
 const SUIT_SYMBOLS: Record<string, string> = {
@@ -26,9 +34,14 @@ function parseCard(card: string): { rank: string; suit: string } {
   return { rank, suit };
 }
 
-const Card: React.FC<CardProps> = ({ card, faceDown = false, small = false }) => {
+function Card({ card, faceDown = false, small = false, animationDelay }: CardProps) {
   const w = small ? 44 : 56;
   const h = small ? 64 : 80;
+  const animate = animationDelay !== undefined;
+
+  const animStyle: CSSProperties = animate
+    ? { animation: `card-reveal 0.35s ease-out ${animationDelay}s both` }
+    : {};
 
   if (faceDown || !card) {
     return (
@@ -37,12 +50,13 @@ const Card: React.FC<CardProps> = ({ card, faceDown = false, small = false }) =>
           width: w,
           height: h,
           borderRadius: 6,
-          background: "linear-gradient(135deg, #2c3e50, #3d566e)",
-          border: "2px solid #4a6785",
+          background: "linear-gradient(135deg, var(--border-default), #3d566e)",
+          border: "2px solid var(--border-input)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: small ? 14 : 18,
+          ...animStyle,
         }}
       >
         🂠
@@ -72,12 +86,13 @@ const Card: React.FC<CardProps> = ({ card, faceDown = false, small = false }) =>
         fontFamily: "monospace",
         gap: 2,
         boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+        ...animStyle,
       }}
     >
       <span>{rank}</span>
       <span style={{ fontSize: small ? 16 : 20 }}>{symbol}</span>
     </div>
   );
-};
+}
 
 export default Card;
