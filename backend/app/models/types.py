@@ -1,3 +1,12 @@
+"""Shared enumerations used throughout the poker engine.
+
+Suit        — card suits (c/d/h/s)
+Rank        — card ranks (2-14, with short-name property)
+HandRanking — poker hand categories (High Card → Royal Flush)
+Street      — betting rounds (preflop → flop → turn → river → showdown)
+ActionType  — player actions (fold, check, call, bet, raise, all_in, post_blind)
+"""
+
 from enum import IntEnum, StrEnum
 
 

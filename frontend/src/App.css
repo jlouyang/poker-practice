@@ -1,11 +1,84 @@
 .app {
   display: flex;
   flex-direction: column;
-  align-items: center;
   min-height: 100vh;
-  background: #1a1a2e;
-  color: #e0e0e0;
-  font-family: system-ui, -apple-system, sans-serif;
-  padding: 8px 16px 16px;
-  gap: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+}
+
+.app-header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg) var(--space-lg);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.app-table {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-lg);
+}
+
+.app-controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
+}
+
+.hand-result-bar {
+  text-align: center;
+  padding: 10px 20px;
+  background: rgba(46, 204, 113, 0.1);
+  border-radius: var(--radius-lg);
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+}
+
+.result-win-text {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.hint-panel {
+  background: rgba(30, 40, 55, 0.95);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 10px 18px;
+  max-width: 460px;
+  text-align: center;
+}
+
+.training-tools-bar {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 600px;
+}
+
+.coach-toggle-btn {
+  position: fixed;
+  bottom: var(--space-lg);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px var(--accent-glow);
+  z-index: var(--z-coach-toggle);
 }

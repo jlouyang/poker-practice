@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db.models import HandRecord, PlayerStateRecord, ActionRecord, AnalysisRecord
+from app.db.models import ActionRecord, AnalysisRecord, HandRecord, PlayerStateRecord
 
 
 def save_hand(
@@ -76,6 +75,8 @@ def save_analysis(
             player_id=r["player_id"],
             street=r["street"],
             equity_at_decision=r["equity"],
+            optimal_action=r.get("optimal_action"),
+            ev_of_action=r.get("ev_of_action"),
             score=r["score"],
             sequence=i,
         )
@@ -85,23 +86,13 @@ def save_analysis(
     return records
 
 
-def get_hand(db: Session, hand_id: int) -> Optional[HandRecord]:
+def get_hand(db: Session, hand_id: int) -> HandRecord | None:
     return db.query(HandRecord).filter(HandRecord.id == hand_id).first()
 
 
 def get_hands_for_session(db: Session, session_id: str) -> list[HandRecord]:
-    return (
-        db.query(HandRecord)
-        .filter(HandRecord.session_id == session_id)
-        .order_by(HandRecord.hand_number)
-        .all()
-    )
+    return db.query(HandRecord).filter(HandRecord.session_id == session_id).order_by(HandRecord.hand_number).all()
 
 
 def get_analysis_for_hand(db: Session, hand_id: int) -> list[AnalysisRecord]:
-    return (
-        db.query(AnalysisRecord)
-        .filter(AnalysisRecord.hand_id == hand_id)
-        .order_by(AnalysisRecord.sequence)
-        .all()
-    )
+    return db.query(AnalysisRecord).filter(AnalysisRecord.hand_id == hand_id).order_by(AnalysisRecord.sequence).all()

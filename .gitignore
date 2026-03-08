@@ -8,3 +8,13 @@ build/
 .pytest_cache/
 *.db
 .env
+.env.*
+!.env.example
+.envrc
+*.pem
+*.key
+*.p12
+.ruff_cache/
+.idea/
+.vscode/
+.venv_deps/

@@ -1,17 +1,26 @@
-import React from "react";
+import { useRef, useEffect } from "react";
 import Card from "./Card";
 
 interface CommunityCardsProps {
   cards: string[];
 }
 
-const CommunityCards: React.FC<CommunityCardsProps> = ({ cards }) => {
+function CommunityCards({ cards }: CommunityCardsProps) {
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    prevCountRef.current = cards.length;
+  }, [cards.length]);
+
+  const prevCount = prevCountRef.current;
   const slots = 5;
   const rendered = [];
 
   for (let i = 0; i < slots; i++) {
     if (i < cards.length) {
-      rendered.push(<Card key={i} card={cards[i]} />);
+      const isNew = i >= prevCount;
+      const delay = isNew ? (i - prevCount) * 0.1 : undefined;
+      rendered.push(<Card key={`${i}-${cards[i]}`} card={cards[i]} animationDelay={delay} />);
     } else {
       rendered.push(
         <div
@@ -33,6 +42,6 @@ const CommunityCards: React.FC<CommunityCardsProps> = ({ cards }) => {
       {rendered}
     </div>
   );
-};
+}
 
 export default CommunityCards;

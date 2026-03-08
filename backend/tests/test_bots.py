@@ -3,10 +3,10 @@
 import random
 
 from app.bots.fish import FishBot
-from app.bots.regular import RegularBot
 from app.bots.interface import BotAction
-from app.bots.visible_state import make_visible_state
 from app.bots.profiles import PRESET_PROFILES, get_profile
+from app.bots.regular import RegularBot
+from app.bots.visible_state import make_visible_state
 from app.engine.game import GameEngine
 from app.engine.validators import get_legal_actions
 from app.models.types import ActionType
@@ -81,7 +81,7 @@ class TestRegularBot:
 
 class TestProfiles:
     def test_all_profiles_create_bots(self):
-        for name, profile in PRESET_PROFILES.items():
+        for _name, profile in PRESET_PROFILES.items():
             bot = profile.create_bot()
             assert bot.tier == profile.tier
 
@@ -151,9 +151,7 @@ class TestStressTest:
             hands_completed += 1
 
             total_stacks = sum(p.stack for p in state.players)
-            assert total_stacks == initial_total, (
-                f"Stack conservation violated: {total_stacks} != {initial_total}"
-            )
+            assert total_stacks == initial_total, f"Stack conservation violated: {total_stacks} != {initial_total}"
 
             engine.rotate_dealer()
 

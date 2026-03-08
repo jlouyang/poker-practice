@@ -1,6 +1,15 @@
+"""Information-filtered game state that bots receive for decision-making.
+
+VisibleGameState hides opponent hole cards and exposes only what a player
+at the table could legitimately see: their own cards, community cards, pot,
+stacks, bets, action history, and opponent presence.
+
+make_visible_state(game_state, player_id) constructs the filtered view.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.engine.game_state import GameState, PlayerAction
 from app.models.card import Card
@@ -20,6 +29,7 @@ class OpponentInfo:
 @dataclass
 class VisibleGameState:
     """Game state filtered to what a specific player can see."""
+
     my_id: str
     my_seat: int
     my_stack: int
@@ -44,13 +54,7 @@ class VisibleGameState:
 
 def make_visible_state(game_state: GameState, player_id: str) -> VisibleGameState:
     """Create a view of the game state visible to a specific player."""
-    player = None
-    for p in game_state.players:
-        if p.player_id == player_id:
-            player = p
-            break
-    if player is None:
-        raise ValueError(f"Player {player_id} not in game")
+    player = game_state.get_player(player_id)
 
     opponents = [
         OpponentInfo(

@@ -3,9 +3,7 @@
 import pytest
 
 from app.engine.game import GameEngine
-from app.engine.game_state import Pot
 from app.engine.pot import calculate_pots
-from app.engine.validators import get_legal_actions
 from app.models.types import ActionType, Street
 
 
@@ -149,7 +147,7 @@ class TestBetting:
         engine.start_hand()
         state = engine.state
         current = state.current_player
-        other = [p for p in state.players if p.player_id != current.player_id][0]
+        other = next(p for p in state.players if p.player_id != current.player_id)
         with pytest.raises(ValueError):
             engine.apply_action(other.player_id, ActionType.FOLD)
 
@@ -159,7 +157,8 @@ class TestAllIn:
         engine = GameEngine(
             ["short", "big"],
             {"short": 50, "big": 1000},
-            small_blind=5, big_blind=10,
+            small_blind=5,
+            big_blind=10,
         )
         engine.start_hand()
         state = engine.state
@@ -181,7 +180,8 @@ class TestAllIn:
         engine = GameEngine(
             ["p0", "p1", "p2"],
             {"p0": 100, "p1": 200, "p2": 300},
-            small_blind=5, big_blind=10,
+            small_blind=5,
+            big_blind=10,
         )
         engine.start_hand()
         state = engine.state
@@ -201,6 +201,7 @@ class TestAllIn:
 class TestPotCalculation:
     def test_simple_pot(self):
         from app.engine.game_state import PlayerState
+
         players = [
             PlayerState("a", 0, 900, current_bet=100, is_active=True),
             PlayerState("b", 1, 900, current_bet=100, is_active=True),
@@ -210,6 +211,7 @@ class TestPotCalculation:
 
     def test_side_pot_with_all_in(self):
         from app.engine.game_state import PlayerState
+
         players = [
             PlayerState("a", 0, 0, current_bet=50, is_active=True, is_all_in=True),
             PlayerState("b", 1, 50, current_bet=100, is_active=True),
@@ -225,6 +227,7 @@ class TestPotCalculation:
 
     def test_folded_bets_go_to_pot(self):
         from app.engine.game_state import PlayerState
+
         players = [
             PlayerState("a", 0, 900, current_bet=100, is_active=True),
             PlayerState("b", 1, 900, current_bet=100, is_active=True),

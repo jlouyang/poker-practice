@@ -6,6 +6,11 @@ from app.analysis.equity import calculate_equity
 from app.models.card import Card
 from app.models.types import ActionType
 
+# Rough baseline for how often a bet/raise induces a fold.
+# Real fold equity depends on board texture, opponent type, bet sizing, etc.
+# but 30% is a reasonable middle-ground for a simplified model.
+DEFAULT_FOLD_EQUITY = 0.3
+
 
 def calculate_action_ev(
     hole_cards: list[Card],
@@ -15,14 +20,13 @@ def calculate_action_ev(
     pot_before: int,
     to_call: int,
     num_opponents: int,
+    fold_equity: float = DEFAULT_FOLD_EQUITY,
 ) -> float:
-    """Estimate the EV of a specific action in big blinds.
+    """Estimate the EV of a specific action in chips.
 
     Returns positive for profitable actions, negative for unprofitable.
     """
-    equity = calculate_equity(
-        hole_cards, community_cards, num_opponents, num_simulations=1000
-    )
+    equity = calculate_equity(hole_cards, community_cards, num_opponents, num_simulations=1000)
 
     if action_type == ActionType.FOLD:
         return 0.0
@@ -36,8 +40,6 @@ def calculate_action_ev(
         return ev
 
     if action_type in (ActionType.BET, ActionType.RAISE, ActionType.ALL_IN):
-        # Simplified: assume opponent calls some fraction
-        fold_equity = 0.3  # rough estimate
         call_ev = equity * (pot_before + amount) - (1 - equity) * amount
         fold_ev = pot_before
         ev = fold_equity * fold_ev + (1 - fold_equity) * call_ev

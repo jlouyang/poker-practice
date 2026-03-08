@@ -1,3 +1,13 @@
+"""Hand evaluation using the phevaluator library.
+
+evaluate_hand()  — evaluates a 5-7 card poker hand, returning a HandResult
+                   with numeric rank (1=best, 7462=worst) and hand category.
+compare_hands()  — ranks multiple hands and groups winners (handles ties).
+
+The rank boundaries map phevaluator's numeric rank to standard poker hand
+categories (High Card through Royal Flush).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,11 +15,11 @@ from dataclasses import dataclass
 import phevaluator
 
 from app.models.card import Card
-from app.models.types import HandRanking, HAND_RANKING_NAMES
+from app.models.types import HAND_RANKING_NAMES, HandRanking
 
 # phevaluator rank boundaries (rank 1 = best, 7462 = worst)
 _RANK_BOUNDARIES = [
-    (1, 10, HandRanking.STRAIGHT_FLUSH),   # includes royal flush at rank 1
+    (1, 10, HandRanking.STRAIGHT_FLUSH),  # includes royal flush at rank 1
     (11, 166, HandRanking.FOUR_OF_A_KIND),
     (167, 322, HandRanking.FULL_HOUSE),
     (323, 1599, HandRanking.FLUSH),
@@ -48,10 +58,6 @@ def _classify_rank(rank: int) -> HandRanking:
     raise ValueError(f"Unknown phevaluator rank: {rank}")
 
 
-def _card_to_str(card: Card) -> str:
-    return str(card)
-
-
 def evaluate_hand(hole_cards: list[Card], community_cards: list[Card]) -> HandResult:
     """Evaluate a poker hand from hole cards + community cards.
 
@@ -61,13 +67,10 @@ def evaluate_hand(hole_cards: list[Card], community_cards: list[Card]) -> HandRe
     if not (5 <= len(all_cards) <= 7):
         raise ValueError(f"Need 5-7 total cards, got {len(all_cards)}")
 
-    card_strs = [_card_to_str(c) for c in all_cards]
+    card_strs = [str(c) for c in all_cards]
     rank = phevaluator.evaluate_cards(*card_strs)
     hand_ranking = _classify_rank(rank)
-    hand_name = (
-        "Royal Flush" if hand_ranking == HandRanking.ROYAL_FLUSH
-        else HAND_RANKING_NAMES[hand_ranking]
-    )
+    hand_name = "Royal Flush" if hand_ranking == HandRanking.ROYAL_FLUSH else HAND_RANKING_NAMES[hand_ranking]
     return HandResult(rank=rank, hand_ranking=hand_ranking, hand_name=hand_name)
 
 

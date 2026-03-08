@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from app.bots.interface import BotAction, BotStrategy
+from app.bots.interface import BotAction, BotStrategy, snap_to_bb
 from app.bots.visible_state import VisibleGameState
 from app.models.card import Card
 from app.models.types import ActionType, Rank, Street
@@ -18,7 +18,6 @@ from app.models.types import ActionType, Rank, Street
 _PREMIUM_PAIRS = {Rank.ACE, Rank.KING, Rank.QUEEN}
 _STRONG_PAIRS = {Rank.JACK, Rank.TEN}
 _MEDIUM_PAIRS = {Rank.NINE, Rank.EIGHT, Rank.SEVEN}
-_SMALL_PAIRS = {Rank.SIX, Rank.FIVE, Rank.FOUR, Rank.THREE, Rank.TWO}
 
 
 def _hand_tier(hole_cards: list[Card]) -> int:
@@ -84,10 +83,10 @@ class RegularBot(BotStrategy):
         return self._postflop_decision(state)
 
     def _preflop_decision(self, state: VisibleGameState) -> BotAction:
+        bb = state.big_blind
         tier = _hand_tier(state.my_hole_cards)
         to_call = state.to_call
 
-        # How tight we play: higher tightness -> fewer tiers played
         max_tier_to_play = max(1, 5 - int(self._tightness / 25))
 
         if tier > max_tier_to_play:
@@ -96,29 +95,24 @@ class RegularBot(BotStrategy):
             return BotAction(ActionType.CHECK)
 
         if to_call == 0:
-            # Raise with good hands
             if tier <= 2 or random.random() * 100 < self._aggression:
-                raise_size = max(state.big_blind * 3, state.pot_total)
+                raise_size = snap_to_bb(max(bb * 3, state.pot_total), bb, bb * 2)
                 raise_size = min(raise_size, state.my_stack)
                 return BotAction(ActionType.BET, raise_size)
             return BotAction(ActionType.CHECK)
 
-        # Facing a raise
         if tier == 1:
-            # Re-raise premium hands
-            raise_amount = to_call + max(to_call, state.pot_total)
+            raise_amount = snap_to_bb(to_call + max(to_call, state.pot_total), bb, to_call + bb)
             raise_amount = min(raise_amount, state.my_stack)
             return BotAction(ActionType.RAISE, raise_amount)
 
         if tier <= 2:
-            # Call or sometimes re-raise
             if random.random() * 100 < self._aggression * 0.5:
-                raise_amount = to_call + max(to_call, state.pot_total // 2)
+                raise_amount = snap_to_bb(to_call + max(to_call, state.pot_total // 2), bb, to_call + bb)
                 raise_amount = min(raise_amount, state.my_stack)
                 return BotAction(ActionType.RAISE, raise_amount)
             return BotAction(ActionType.CALL, min(to_call, state.my_stack))
 
-        # Tier 3-4: call smaller bets, fold to big raises
         pot_fraction = to_call / max(state.pot_total, 1)
         if pot_fraction > 0.5:
             return BotAction(ActionType.FOLD)
@@ -126,13 +120,14 @@ class RegularBot(BotStrategy):
         return BotAction(ActionType.CALL, min(to_call, state.my_stack))
 
     def _postflop_decision(self, state: VisibleGameState) -> BotAction:
+        bb = state.big_blind
         to_call = state.to_call
         hand_strength = self._estimate_postflop_strength(state)
 
         if to_call == 0:
             if hand_strength > 0.7 or (hand_strength > 0.4 and random.random() * 100 < self._aggression):
-                bet_size = int(state.pot_total * (0.5 + hand_strength * 0.5))
-                bet_size = max(state.big_blind, min(bet_size, state.my_stack))
+                bet_size = snap_to_bb(int(state.pot_total * (0.5 + hand_strength * 0.5)), bb, bb)
+                bet_size = min(bet_size, state.my_stack)
                 return BotAction(ActionType.BET, bet_size)
             return BotAction(ActionType.CHECK)
 
@@ -140,7 +135,7 @@ class RegularBot(BotStrategy):
 
         if hand_strength > pot_odds + 0.15:
             if hand_strength > 0.8 and random.random() * 100 < self._aggression:
-                raise_amount = to_call + int(state.pot_total * 0.75)
+                raise_amount = snap_to_bb(to_call + int(state.pot_total * 0.75), bb, to_call + bb)
                 raise_amount = min(raise_amount, state.my_stack)
                 return BotAction(ActionType.RAISE, raise_amount)
             return BotAction(ActionType.CALL, min(to_call, state.my_stack))
@@ -152,7 +147,7 @@ class RegularBot(BotStrategy):
 
     def _estimate_postflop_strength(self, state: VisibleGameState) -> float:
         """Simple heuristic postflop hand strength estimate (0 to 1)."""
-        from app.models.hand import evaluate_hand, HandResult
+        from app.models.hand import evaluate_hand
 
         if len(state.community_cards) < 3:
             return 0.5

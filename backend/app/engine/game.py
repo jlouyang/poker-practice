@@ -1,9 +1,26 @@
+"""Core game engine for No-Limit Texas Hold'em.
+
+GameEngine is the stateful heart of a single table. It manages:
+  - Hand lifecycle: deal, blinds, betting rounds, showdown, pot distribution
+  - Player actions: validate and apply fold/check/call/bet/raise/all-in
+  - Street progression: preflop → flop → turn → river → showdown
+  - Side pot calculation when players go all-in with different stacks
+  - Dealer rotation between hands
+
+Usage:
+    engine = GameEngine(player_ids=["p1", "p2", "p3"], starting_stacks=1000)
+    engine.start_hand()
+    engine.apply_action("p1", ActionType.CALL)
+    ...
+    engine.rotate_dealer()  # between hands
+"""
+
 from __future__ import annotations
 
-from app.engine.game_state import GameState, PlayerState, PlayerAction, Pot
+from app.engine.game_state import GameState, PlayerAction, PlayerState, Pot
 from app.engine.pot import calculate_pots, merge_pots
-from app.engine.validators import get_legal_actions, validate_action
-from app.models.card import Card, Deck
+from app.engine.validators import LegalAction, get_legal_actions, validate_action
+from app.models.card import Deck
 from app.models.hand import evaluate_hand
 from app.models.types import ActionType, Street
 
@@ -20,11 +37,7 @@ class GameEngine:
         if len(player_ids) < 2 or len(player_ids) > 9:
             raise ValueError("Need 2-9 players")
 
-        stacks = (
-            starting_stacks
-            if isinstance(starting_stacks, dict)
-            else {pid: starting_stacks for pid in player_ids}
-        )
+        stacks = starting_stacks if isinstance(starting_stacks, dict) else {pid: starting_stacks for pid in player_ids}
         human_ids = human_ids or set()
 
         self.state = GameState(
@@ -125,12 +138,15 @@ class GameEngine:
         state.action_history.append(
             PlayerAction(player_id=player_id, action_type=action_type, amount=amount, street=state.street)
         )
-        self._emit("action", {
-            "player_id": player_id,
-            "action": action_type,
-            "amount": amount,
-            "street": state.street,
-        })
+        self._emit(
+            "action",
+            {
+                "player_id": player_id,
+                "action": action_type,
+                "amount": amount,
+                "street": state.street,
+            },
+        )
 
         if self._check_hand_over():
             return state
@@ -144,7 +160,7 @@ class GameEngine:
 
         return state
 
-    def get_legal_actions(self, player_id: str) -> list:
+    def get_legal_actions(self, player_id: str) -> list[LegalAction]:
         player = self._get_player(player_id)
         return get_legal_actions(self.state, player)
 
@@ -162,10 +178,7 @@ class GameEngine:
     # --- Private methods ---
 
     def _get_player(self, player_id: str) -> PlayerState:
-        for p in self.state.players:
-            if p.player_id == player_id:
-                return p
-        raise ValueError(f"Player {player_id} not found")
+        return self.state.get_player(player_id)
 
     def _post_blinds(self) -> None:
         state = self.state
@@ -186,16 +199,12 @@ class GameEngine:
 
         sb_amount = min(state.small_blind, sb_player.stack)
         self._place_bet(sb_player, sb_amount)
-        state.action_history.append(
-            PlayerAction(sb_player.player_id, ActionType.POST_BLIND, sb_amount, Street.PREFLOP)
-        )
+        state.action_history.append(PlayerAction(sb_player.player_id, ActionType.POST_BLIND, sb_amount, Street.PREFLOP))
         self._emit("blind", {"player_id": sb_player.player_id, "amount": sb_amount, "type": "small"})
 
         bb_amount = min(state.big_blind, bb_player.stack)
         self._place_bet(bb_player, bb_amount)
-        state.action_history.append(
-            PlayerAction(bb_player.player_id, ActionType.POST_BLIND, bb_amount, Street.PREFLOP)
-        )
+        state.action_history.append(PlayerAction(bb_player.player_id, ActionType.POST_BLIND, bb_amount, Street.PREFLOP))
         self._emit("blind", {"player_id": bb_player.player_id, "amount": bb_amount, "type": "big"})
 
     def _place_bet(self, player: PlayerState, amount: int) -> None:
@@ -427,14 +436,21 @@ class GameEngine:
             if winnings[p.player_id] > 0:
                 p.stack += winnings[p.player_id]
 
-        self._emit("showdown", {
-            "winners": {pid: {"amount": amt, "hand": results[pid].hand_name}
-                       for pid, amt in winnings.items() if amt > 0 and pid in results},
-            "hands": {p.player_id: {"cards": [str(c) for c in p.hole_cards],
-                                     "result": results[p.player_id].hand_name}
-                     for p in active},
-            "community": [str(c) for c in community],
-        })
+        self._emit(
+            "showdown",
+            {
+                "winners": {
+                    pid: {"amount": amt, "hand": results[pid].hand_name}
+                    for pid, amt in winnings.items()
+                    if amt > 0 and pid in results
+                },
+                "hands": {
+                    p.player_id: {"cards": [str(c) for c in p.hole_cards], "result": results[p.player_id].hand_name}
+                    for p in active
+                },
+                "community": [str(c) for c in community],
+            },
+        )
 
         state.is_complete = True
 
@@ -448,10 +464,13 @@ class GameEngine:
         for p in state.players:
             p.current_bet = 0
 
-        self._emit("win_uncontested", {
-            "player_id": winner.player_id,
-            "amount": total,
-        })
+        self._emit(
+            "win_uncontested",
+            {
+                "player_id": winner.player_id,
+                "amount": total,
+            },
+        )
         state.is_complete = True
 
     def _end_hand_early(self) -> None:
