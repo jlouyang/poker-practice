@@ -340,14 +340,15 @@ class GameSession:
         try:
             self.engine.apply_action(self.human_id, action_type, amount)
         except ValueError as e:
-            logger.warning("Invalid human action %s/%s: %s — applying fallback", action_type, amount, e)
-            self._safe_fallback_action(self.human_id)
+            logger.warning("Invalid human action %s/%s: %s — re-requesting action", action_type, amount, e)
             await self._send_ws(
                 {
                     "type": "error",
-                    "data": {"message": f"Invalid action ({action_type.value}), applied fallback."},
+                    "data": {"message": str(e) or f"Invalid action: {action_type.value} with amount {amount}. Please try again."},
                 }
             )
+            await self._handle_human_turn()
+            return
 
     async def _handle_bot_turn(self, bot_id: str) -> None:
         bot = self.bots.get(bot_id)

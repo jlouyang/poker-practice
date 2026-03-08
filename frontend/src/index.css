@@ -58,8 +58,10 @@
   --space-lg: 16px;
   --space-xl: 24px;
   --space-2xl: 32px;
-  /* Table layout: gap between header and table so cards never touch header */
-  --table-safe-top: 32px;
+  /* Table layout: gap between header and table so top seat (e.g. bot 3) never overlaps header */
+  --table-safe-top: 100px;
+  /* Gap below table/seats so fold/call/bet controls never overlap the bottom player or table */
+  --table-safe-bottom: 96px;
 
   /* Radii */
   --radius-sm: 6px;

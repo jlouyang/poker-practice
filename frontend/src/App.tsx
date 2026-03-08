@@ -268,9 +268,10 @@ function App() {
         </div>
       )}
 
-      {/* ── Table ── */}
-      <div className="app-table">
-        <Table
+      {/* ── Scrollable main: table + controls (no overlap when viewport is short) ── */}
+      <main className="app-main" aria-label="Table and controls">
+        <div className="app-table">
+          <Table
           players={g.gameState.players}
           communityCards={g.gameState.community_cards}
           pot={g.gameState.pot}
@@ -280,11 +281,10 @@ function App() {
           handNumber={g.gameState.hand_number}
           playerStats={g.playerStats}
           showPositionGuide={trainingTools.positionGuide}
-        />
-      </div>
+          />
+        </div>
 
-      {/* ── Controls ── */}
-      <div className="app-controls">
+        <div className="app-controls">
         {g.handResult && (
           <HandResultBar
             handResult={g.handResult}
@@ -321,6 +321,7 @@ function App() {
         <ActionPanel
           legalActions={g.legalActions}
           onAction={sendAction}
+          onError={(msg) => toast.error(msg)}
           disabled={!g.isMyTurn}
           potSize={g.gameState.pot}
           bigBlind={g.bigBlind}
@@ -330,7 +331,8 @@ function App() {
           showHint={!!g.hint}
           showSizingTips={trainingTools.sizingTips}
         />
-      </div>
+        </div>
+      </main>
 
       {/* ── Modals ── */}
       <Modal open={g.showLegend} onClose={() => toggle("showLegend", false)} title="Abbreviation Legend" maxWidth={380} titleId="legend-title">

@@ -65,90 +65,89 @@ function Player({ player, isDealer, isCurrent, showCards, stats, blindLabel, pos
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {isDealer && (
-        <div
-          style={{
-            position: "absolute",
-            top: -10,
-            right: -10,
-            background: "var(--color-gold)",
-            color: "#000",
-            borderRadius: "50%",
-            width: 22,
-            height: 22,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 11,
-            fontWeight: 800,
-          }}
-        >
-          D
-        </div>
-      )}
-
-      {blindLabel && (
-        <div
-          style={{
-            position: "absolute",
-            top: -10,
-            left: -10,
-            background: blindLabel === "SB" ? "var(--color-info)" : "var(--color-orange)",
-            color: "#fff",
-            borderRadius: "50%",
-            width: 22,
-            height: 22,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 9,
-            fontWeight: 800,
-            letterSpacing: -0.5,
-          }}
-        >
-          {blindLabel}
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 4 }}>
-        {player.hole_cards && showCards
-          ? player.hole_cards.map((c, i) => <Card key={i} card={c} small />)
-          : player.is_active
-          ? [<Card key={0} faceDown small />, <Card key={1} faceDown small />]
-          : null}
-      </div>
-
+      {/* Single box outside table: cards + name (chip stack is on the table in Table.tsx) */}
       <div
         style={{
-          background: isCurrent
-            ? "rgba(46, 204, 113, 0.2)"
-            : isHuman
-            ? "rgba(52, 152, 219, 0.15)"
-            : "rgba(255,255,255,0.05)",
+          background: "rgba(0,0,0,0.75)",
           border: isCurrent
             ? "2px solid var(--color-success)"
             : isHuman
             ? "2px solid var(--color-info)"
             : "1px solid var(--border-input)",
-          borderRadius: 10,
-          padding: "6px 12px",
-          textAlign: "center",
+          borderRadius: 12,
+          padding: "8px 10px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 6,
           minWidth: 90,
           cursor: !isHuman ? "pointer" : "default",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
         }}
       >
+        {isDealer && (
+          <div
+            style={{
+              position: "absolute",
+              top: -10,
+              right: -10,
+              background: "var(--color-gold)",
+              color: "#000",
+              borderRadius: "50%",
+              width: 22,
+              height: 22,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 11,
+              fontWeight: 800,
+              zIndex: 1,
+            }}
+          >
+            D
+          </div>
+        )}
+
+        {blindLabel && (
+          <div
+            style={{
+              position: "absolute",
+              top: -10,
+              left: -10,
+              background: blindLabel === "SB" ? "var(--color-info)" : "var(--color-orange)",
+              color: "#fff",
+              borderRadius: "50%",
+              width: 22,
+              height: 22,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: -0.5,
+              zIndex: 1,
+            }}
+          >
+            {blindLabel}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 4 }}>
+          {player.hole_cards && showCards
+            ? player.hole_cards.map((c, i) => <Card key={i} card={c} small />)
+            : player.is_active
+            ? [<Card key={0} faceDown small />, <Card key={1} faceDown small />]
+            : null}
+        </div>
+
         <div
           style={{
             fontSize: 13,
             fontWeight: 600,
             color: isHuman ? "var(--color-info)" : "var(--text-light)",
-            marginBottom: 2,
           }}
         >
           {formatPlayerName(player.player_id)}
-        </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
-          {player.stack}
         </div>
         {player.is_all_in && (
           <div
@@ -156,32 +155,30 @@ function Player({ player, isDealer, isCurrent, showCards, stats, blindLabel, pos
               fontSize: 11,
               color: "var(--color-danger)",
               fontWeight: 700,
-              marginTop: 2,
             }}
           >
             ALL IN
           </div>
         )}
+        {showPositionGuide && positionName && (
+          <div
+            title={positionTip(positionName)}
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: positionColor(positionName),
+              background: "rgba(0,0,0,0.6)",
+              padding: "2px 6px",
+              borderRadius: 4,
+              letterSpacing: 0.5,
+              cursor: "help",
+              border: `1px solid ${positionColor(positionName)}33`,
+            }}
+          >
+            {positionName}
+          </div>
+        )}
       </div>
-
-      {showPositionGuide && positionName && (
-        <div
-          title={positionTip(positionName)}
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: positionColor(positionName),
-            background: "rgba(0,0,0,0.6)",
-            padding: "2px 6px",
-            borderRadius: 4,
-            letterSpacing: 0.5,
-            cursor: "help",
-            border: `1px solid ${positionColor(positionName)}33`,
-          }}
-        >
-          {positionName}
-        </div>
-      )}
 
       {showHud && (
         <div style={{ position: "absolute", top: "100%", marginTop: 4, zIndex: 20 }}>

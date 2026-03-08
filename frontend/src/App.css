@@ -17,13 +17,22 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.app-table {
+/* Scrollable area: table + controls get natural height; scroll when viewport is short (no overlap) */
+.app-main {
   flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-table {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--table-safe-top, var(--space-xl)) var(--space-lg) var(--space-lg);
-  min-height: 0;
+  padding: var(--table-safe-top, var(--space-xl)) var(--space-lg) var(--table-safe-bottom);
 }
 
 .app-controls {
@@ -33,6 +42,9 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg) var(--space-lg);
+  /* Ensure fold/call/bet bar never overlaps table or bottom seat */
+  margin-top: 0;
+  min-height: 0;
 }
 
 .hand-result-bar {

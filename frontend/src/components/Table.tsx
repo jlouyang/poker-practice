@@ -2,7 +2,7 @@
  * Poker table layout with oval felt, player seats, chip stacks, and bets.
  *
  * Partitioned layout (see docs/TABLE_LAYOUT.md):
- * - Player zone: SEAT_POSITIONS (just outside felt) — cards and name box.
+ * - Player zone: seats on rays from center, just outside felt — cards and name box.
  * - Chip rail: stack chips on the ellipse boundary (ray–ellipse intersection).
  * - Bet ring: bet chips inward from rail toward center, clamped on felt.
  */
@@ -108,76 +108,32 @@ function computeBlindSeats(players: PlayerInfo[], dealerSeat: number): { sb: num
   return { sb, bb };
 }
 
-/** Seat positions (%). Seats sit just outside FELT_INSET so cards don't overlap the table. */
-const SEAT_POSITIONS: Record<number, { x: number; y: number }[]> = {
-  2: [
-    { x: 50, y: 88 },
-    { x: 50, y: 12 },
-  ],
-  3: [
-    { x: 50, y: 88 },
-    { x: 6, y: 20 },
-    { x: 94, y: 20 },
-  ],
-  4: [
-    { x: 50, y: 88 },
-    { x: 6, y: 50 },
-    { x: 50, y: 12 },
-    { x: 94, y: 50 },
-  ],
-  5: [
-    { x: 50, y: 88 },
-    { x: 6, y: 56 },
-    { x: 18, y: 12 },
-    { x: 82, y: 12 },
-    { x: 94, y: 56 },
-  ],
-  6: [
-    { x: 50, y: 88 },
-    { x: 6, y: 56 },
-    { x: 10, y: 12 },
-    { x: 50, y: 12 },
-    { x: 90, y: 12 },
-    { x: 94, y: 56 },
-  ],
-  7: [
-    { x: 50, y: 88 },
-    { x: 6, y: 62 },
-    { x: 8, y: 14 },
-    { x: 30, y: 12 },
-    { x: 70, y: 12 },
-    { x: 92, y: 14 },
-    { x: 94, y: 62 },
-  ],
-  8: [
-    { x: 50, y: 88 },
-    { x: 6, y: 65 },
-    { x: 6, y: 28 },
-    { x: 24, y: 12 },
-    { x: 50, y: 12 },
-    { x: 76, y: 12 },
-    { x: 94, y: 28 },
-    { x: 94, y: 65 },
-  ],
-  9: [
-    { x: 50, y: 88 },
-    { x: 6, y: 70 },
-    { x: 6, y: 36 },
-    { x: 18, y: 12 },
-    { x: 38, y: 12 },
-    { x: 62, y: 12 },
-    { x: 82, y: 12 },
-    { x: 94, y: 36 },
-    { x: 94, y: 70 },
-  ],
-};
+/**
+ * Seat positions derived from the felt ellipse: each seat is placed on a ray
+ * from the center, strictly outside the ellipse so the full player box (cards +
+ * name) and chip stack area never overlap the felt. Angle 0° = top, 90° = right,
+ * 180° = bottom (seat 0 / human). Evenly spaced so players sit around the felt.
+ */
+const SEAT_OUTWARD = 1.55; // >1 so seat center is outside ellipse; 1.55 keeps player box clear of felt without pushing seats too far
+
+function getSeatPositionsAroundFelt(n: number): { x: number; y: number }[] {
+  const positions: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    // 180° = bottom (human); then counter-clockwise
+    const angleDeg = 180 + (i * 360) / n;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const x = FELT_CX + FELT_RX * SEAT_OUTWARD * Math.sin(angleRad);
+    const y = FELT_CY - FELT_RY * SEAT_OUTWARD * Math.cos(angleRad);
+    positions.push({ x, y });
+  }
+  return positions;
+}
 
 /**
- * Stack chips: on the table at the rail (ellipse edge). Position = point where
- * ray from seat to center hits the ellipse, then 99% of the way from center to
- * that point so the stack sits right at the edge.
+ * Stack chips: on the table, strictly within the green. Position = rail (ellipse
+ * along ray from seat to center), then scaled inward so the whole stack sits inside the felt.
  */
-const STACK_AT_EDGE = 0.99; // 1 = on rail, 0.99 = 1% inward so clearly on table
+const STACK_AT_EDGE = 0.90; // scale from center toward rail: 0.90 = stack center well inside felt so stack is strictly on green
 
 function chipOnRail(seat: { x: number; y: number }): { x: number; y: number } {
   const dx = FELT_CX - seat.x;
@@ -218,10 +174,10 @@ function clampToFeltEllipse(px: number, py: number): { x: number; y: number } {
 }
 
 /**
- * Bet chips: well inward from the rail toward center so they don't overlap cards.
- * Fraction = how far from rail to center (0.75 = 75% of the way to center).
+ * Bet chips: placed along the ray from rail toward center. Lower = closer to the player (rail).
+ * Fraction = how far from rail toward center (0.4 = 40% of the way, so bet sits closer to player).
  */
-const BET_INWARD_FRACTION = 0.75;
+const BET_INWARD_FRACTION = 0.4;
 
 function betOnTable(seat: { x: number; y: number }): { x: number; y: number } {
   const rail = chipOnRail(seat);
@@ -244,7 +200,7 @@ function Table({
   showPositionGuide,
 }: TableProps) {
   const n = players.length;
-  const positions = SEAT_POSITIONS[n] || SEAT_POSITIONS[6];
+  const positions = getSeatPositionsAroundFelt(n);
   const { sb, bb } = computeBlindSeats(players, dealerSeat);
   const positionMap = computePositions(players, dealerSeat);
 
@@ -260,9 +216,10 @@ function Table({
         overflow: "visible",
       }}
     >
-      {/* Table felt — oval inset from container; matches FELT_INSET / clampToFeltEllipse */}
+      {/* Table felt — oval inset from container; matches FELT_INSET / clampToFeltEllipse. z-index below seats so players never render under felt. */}
       <div
         className="table-felt"
+        data-testid="table-felt"
         style={{
           position: "absolute",
           top: `${FELT_INSET.top}%`,
@@ -275,6 +232,7 @@ function Table({
           border: "6px solid #2c1810",
           boxShadow:
             "inset 0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,0,0,0.5)",
+          zIndex: 0,
         }}
       />
 
@@ -385,6 +343,7 @@ function Table({
           <div
             key={player.player_id}
             className="table-seat"
+            data-testid={`table-seat-${player.seat}`}
             style={{
               position: "absolute",
               left: `${pos.x}%`,

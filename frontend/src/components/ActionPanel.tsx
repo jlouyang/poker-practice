@@ -7,12 +7,13 @@
  *   - Hint button triggers equity calculation on the server
  *   - Amounts are displayed as "total bet" but sent as "additional chips" to the server
  */
-import { useState, useCallback, type CSSProperties } from "react";
+import { useState, useCallback, useEffect, type CSSProperties } from "react";
 import type { LegalAction } from "../types";
 
 interface ActionPanelProps {
   legalActions: LegalAction[];
   onAction: (action: string, amount: number) => void;
+  onError?: (message: string) => void;
   disabled: boolean;
   potSize: number;
   bigBlind: number;
@@ -33,6 +34,7 @@ function snapToBB(value: number, min: number, max: number, bb: number): number {
 function ActionPanel({
   legalActions,
   onAction,
+  onError,
   disabled,
   potSize,
   bigBlind,
@@ -52,17 +54,36 @@ function ActionPanel({
 
   const [raiseTotal, setRaiseTotal] = useState(minTotal);
 
+  // Keep raise total in valid range when min/max change (e.g. new street or legal actions update)
+  useEffect(() => {
+    setRaiseTotal((prev) => {
+      const clamped = Math.min(maxTotal, Math.max(minTotal, prev));
+      return minTotal > 0 && clamped < minTotal ? minTotal : clamped;
+    });
+  }, [minTotal, maxTotal]);
+
   const clampAndSnap = useCallback(
     (v: number) => snapToBB(v, minTotal, maxTotal, bigBlind),
     [minTotal, maxTotal, bigBlind]
   );
 
   const handleBet = useCallback(() => {
-    if (raiseAction) {
-      const additional = raiseTotal - myCurrentBet;
-      onAction(raiseAction.action_type, additional);
+    if (!raiseAction) return;
+    const additional = raiseTotal - myCurrentBet;
+    if (additional < raiseAction.min_amount) {
+      onError?.(
+        `Raise amount (${additional}) is below the minimum (${raiseAction.min_amount}). Please choose a valid amount.`
+      );
+      return;
     }
-  }, [raiseAction, raiseTotal, myCurrentBet, onAction]);
+    if (additional > raiseAction.max_amount) {
+      onError?.(
+        `Raise amount (${additional}) is above the maximum (${raiseAction.max_amount}). Please choose a valid amount.`
+      );
+      return;
+    }
+    onAction(raiseAction.action_type, additional);
+  }, [raiseAction, raiseTotal, myCurrentBet, onAction, onError]);
 
   const presetBtnStyle = (active: boolean): CSSProperties => ({
     padding: "4px 10px",
