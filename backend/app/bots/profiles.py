@@ -2,6 +2,8 @@
 
 BotProfile  — immutable config (name, tier, tightness, aggression, description).
               Its create_bot() factory method dispatches to the correct tier class.
+              When creating a bot, tightness and aggression get a small random
+              variance so the same preset plays slightly differently each game.
 
 PRESET_PROFILES — dictionary of all built-in bot profiles, keyed by slug.
                   Used by the session manager to populate tables based on difficulty.
@@ -12,7 +14,12 @@ in session.py, which uses weighted random sampling across tiers.
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
+
+# Random variance applied to tightness/aggression when creating a bot (e.g. ±8 → 55 becomes 47–63).
+# Keeps the preset's identity while making the same bot feel less robotic across sessions.
+PERSONALITY_VARIANCE = 8
 
 from app.bots.fish import FishBot
 from app.bots.gto import GTOBot
@@ -31,16 +38,18 @@ class BotProfile:
     description: str
 
     def create_bot(self) -> BotStrategy:
+        t = max(0, min(100, self.tightness + random.randint(-PERSONALITY_VARIANCE, PERSONALITY_VARIANCE)))
+        a = max(0, min(100, self.aggression + random.randint(-PERSONALITY_VARIANCE, PERSONALITY_VARIANCE)))
         if self.tier == 1:
-            return FishBot(tightness=self.tightness, aggression=self.aggression)
+            return FishBot(tightness=t, aggression=a)
         if self.tier == 2:
-            return RegularBot(tightness=self.tightness, aggression=self.aggression)
+            return RegularBot(tightness=t, aggression=a)
         if self.tier == 3:
-            return SharkBot(tightness=self.tightness, aggression=self.aggression)
+            return SharkBot(tightness=t, aggression=a)
         if self.tier == 4:
             if self.name.startswith("Coach"):
-                return LLMCoachBot(tightness=self.tightness, aggression=self.aggression)
-            return GTOBot(tightness=self.tightness, aggression=self.aggression)
+                return LLMCoachBot(tightness=t, aggression=a)
+            return GTOBot(tightness=t, aggression=a)
         raise ValueError(f"Unknown tier: {self.tier}")
 
 
