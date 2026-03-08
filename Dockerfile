@@ -26,6 +26,6 @@ COPY --from=frontend /app/dist /app/static
 # No reload in production; point app at SPA assets
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV STATIC_DIR=/app/static
-EXPOSE 8000
-# Railway (and others) inject PORT at runtime; default 8000 for local Docker
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+EXPOSE 8080
+# Railway injects PORT at runtime; app must listen on 0.0.0.0:$PORT
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
