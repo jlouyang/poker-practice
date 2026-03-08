@@ -7,7 +7,7 @@
  *   - Hint button triggers equity calculation on the server
  *   - Amounts are displayed as "total bet" but sent as "additional chips" to the server
  */
-import { useState, useCallback, useEffect, type CSSProperties } from "react";
+import { useState, useCallback, useMemo, type CSSProperties } from "react";
 import type { LegalAction } from "../types";
 
 interface ActionPanelProps {
@@ -54,13 +54,11 @@ function ActionPanel({
 
   const [raiseTotal, setRaiseTotal] = useState(minTotal);
 
-  // Keep raise total in valid range when min/max change (e.g. new street or legal actions update)
-  useEffect(() => {
-    setRaiseTotal((prev) => {
-      const clamped = Math.min(maxTotal, Math.max(minTotal, prev));
-      return minTotal > 0 && clamped < minTotal ? minTotal : clamped;
-    });
-  }, [minTotal, maxTotal]);
+  // Derive clamped value for display and submit (avoids setState in effect when min/max change)
+  const effectiveRaiseTotal = useMemo(() => {
+    const clamped = Math.min(maxTotal, Math.max(minTotal, raiseTotal));
+    return minTotal > 0 && clamped < minTotal ? minTotal : clamped;
+  }, [minTotal, maxTotal, raiseTotal]);
 
   const clampAndSnap = useCallback(
     (v: number) => snapToBB(v, minTotal, maxTotal, bigBlind),
@@ -69,7 +67,7 @@ function ActionPanel({
 
   const handleBet = useCallback(() => {
     if (!raiseAction) return;
-    const additional = raiseTotal - myCurrentBet;
+    const additional = effectiveRaiseTotal - myCurrentBet;
     if (additional < raiseAction.min_amount) {
       onError?.(
         `Raise amount (${additional}) is below the minimum (${raiseAction.min_amount}). Please choose a valid amount.`
@@ -83,7 +81,7 @@ function ActionPanel({
       return;
     }
     onAction(raiseAction.action_type, additional);
-  }, [raiseAction, raiseTotal, myCurrentBet, onAction, onError]);
+  }, [raiseAction, effectiveRaiseTotal, myCurrentBet, onAction, onError]);
 
   const presetBtnStyle = (active: boolean): CSSProperties => ({
     padding: "4px 10px",
@@ -196,7 +194,7 @@ function ActionPanel({
             min={minTotal}
             max={maxTotal}
             step={bigBlind}
-            value={raiseTotal}
+            value={effectiveRaiseTotal}
             onChange={(e) => setRaiseTotal(clampAndSnap(Number(e.target.value)))}
             style={{ width: 120, accentColor: "var(--color-orange)" }}
             disabled={disabled}
@@ -206,7 +204,7 @@ function ActionPanel({
             min={minTotal}
             max={maxTotal}
             step={bigBlind}
-            value={raiseTotal}
+            value={effectiveRaiseTotal}
             onChange={(e) => setRaiseTotal(clampAndSnap(Number(e.target.value)))}
             style={{
               width: 70,
@@ -225,7 +223,7 @@ function ActionPanel({
             disabled={disabled}
             onClick={handleBet}
           >
-            {isBet ? "Bet" : "Raise to"} {raiseTotal}
+            {isBet ? "Bet" : "Raise to"} {effectiveRaiseTotal}
           </button>
         </div>
       )}

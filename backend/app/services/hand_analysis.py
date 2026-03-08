@@ -84,7 +84,7 @@ def analyze_hand(
             if aggressor_id:
                 actions_before_this = all_actions[:i]
                 opponent_actions = [a for a in actions_before_this if a.player_id == aggressor_id]
-                range_pct, range_desc = infer_range_pct(opponent_actions, action.street)
+                range_pct, _ = infer_range_pct(opponent_actions, action.street)
                 if 0 < range_pct < 100 and opponent_actions:
                     range_labels = range_pct_to_hand_labels(range_pct)
                     eq_data = calculate_equity_vs_range_detailed(
