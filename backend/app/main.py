@@ -3,14 +3,19 @@
 Creates the app instance, registers CORS middleware, includes API and
 WebSocket routers, and starts the background session cleanup task on boot.
 
+In production (when static/ exists), serves the frontend SPA at / so the app
+can be deployed as a single container.
+
 Run with: uvicorn app.main:app --port 8000 --reload
 """
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -22,7 +27,6 @@ from app.api.ws import router as ws_router
 _cors_origins = os.environ.get(
     "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
 ).split(",")
-
 
 
 @asynccontextmanager
@@ -50,3 +54,10 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": "0.1.0", "active_sessions": active_session_count()}
+
+
+# Serve frontend SPA when static build is present (production Docker image).
+# STATIC_DIR is set in production Dockerfile; with pip install . the app runs from site-packages.
+_static_dir = os.environ.get("STATIC_DIR") or str(Path(__file__).resolve().parent.parent / "static")
+if Path(_static_dir).is_dir():
+    app.mount("/", StaticFiles(directory=_static_dir, html=True), name="spa")

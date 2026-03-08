@@ -7,7 +7,7 @@
  *   - Hint button triggers equity calculation on the server
  *   - Amounts are displayed as "total bet" but sent as "additional chips" to the server
  */
-import { useState, useCallback, useEffect, type CSSProperties } from "react";
+import { useState, useCallback, type CSSProperties } from "react";
 import type { LegalAction } from "../types";
 
 interface ActionPanelProps {
@@ -51,10 +51,6 @@ function ActionPanel({
   const maxTotal = raiseAction ? myCurrentBet + raiseAction.max_amount : 0;
 
   const [raiseTotal, setRaiseTotal] = useState(minTotal);
-
-  useEffect(() => {
-    setRaiseTotal(minTotal);
-  }, [minTotal, maxTotal]);
 
   const clampAndSnap = useCallback(
     (v: number) => snapToBB(v, minTotal, maxTotal, bigBlind),
@@ -151,7 +147,10 @@ function ActionPanel({
       )}
 
       {raiseAction && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+        <div
+          key={`${minTotal}-${maxTotal}`}
+          style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}
+        >
           <div style={{ display: "flex", gap: 4 }}>
             {presets.map((p) => (
               <button

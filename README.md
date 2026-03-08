@@ -23,10 +23,13 @@ npm run dev
 
 Open http://localhost:5173.
 
-### Docker
+### Docker (development)
 ```bash
 docker compose up
 ```
+
+### Production deploy
+One container serves API, WebSockets, and frontend. See **[DEPLOY.md](DEPLOY.md)** for `docker-compose.prod.yml`, env vars, and hosting options (Railway, Render, Fly.io, VPS).
 
 ### Tests
 ```bash
