@@ -84,7 +84,8 @@ async def request_id_and_access_log(request: Request, call_next):
     """Assign X-Request-ID, count requests, log method/path/status/duration."""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     request.state.request_id = request_id
-    request.app.state.total_requests += 1
+    n = getattr(request.app.state, "total_requests", 0) + 1
+    setattr(request.app.state, "total_requests", n)
     start = time.monotonic()
     response = await call_next(request)
     duration_ms = round((time.monotonic() - start) * 1000, 2)
@@ -120,7 +121,8 @@ async def health_check():
 @app.get("/metrics")
 async def metrics():
     """Light metrics: uptime, active sessions, total HTTP requests since boot."""
-    uptime_seconds = round(time.monotonic() - app.state.start_time, 1)
+    start_time = getattr(app.state, "start_time", None)
+    uptime_seconds = round(time.monotonic() - start_time, 1) if start_time is not None else 0.0
     return {
         "uptime_seconds": uptime_seconds,
         "active_sessions": active_session_count(),
