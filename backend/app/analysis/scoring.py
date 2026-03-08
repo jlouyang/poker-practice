@@ -20,14 +20,23 @@ def score_decision(
     to_call: int,
     num_opponents: int,
     include_details: bool = False,
+    equity_override: float | None = None,
+    equity_details_override: dict | None = None,
 ) -> dict:
     """Score a single decision.
 
     Returns dict with equity, optimal_action suggestion, score label,
     reasoning, and recommendation. If include_details is True, adds
     a full Monte Carlo breakdown under 'equity_details'.
+
+    If equity_override is set (e.g. from range-based equity), it is used
+    instead of computing equity; equity_details_override is used for
+    equity_details when include_details is True.
     """
-    if include_details:
+    if equity_override is not None:
+        equity = equity_override
+        eq_data = equity_details_override
+    elif include_details:
         eq_data = calculate_equity_detailed(hole_cards, community_cards, num_opponents, num_simulations=1000)
         equity = eq_data["equity"]
     else:
@@ -67,12 +76,12 @@ def score_decision(
     if include_details and eq_data:
         decision_steps = _build_decision_steps(equity, pot_odds, to_call, optimal)
         result["equity_details"] = {
-            "simulations": eq_data["simulations"],
-            "wins": eq_data["wins"],
-            "ties": eq_data["ties"],
-            "losses": eq_data["losses"],
-            "current_hand": eq_data["current_hand"],
-            "hand_distribution": eq_data["hand_distribution"],
+            "simulations": eq_data.get("simulations", 0),
+            "wins": eq_data.get("wins", 0),
+            "ties": eq_data.get("ties", 0),
+            "losses": eq_data.get("losses", 0),
+            "current_hand": eq_data.get("current_hand"),
+            "hand_distribution": eq_data.get("hand_distribution", []),
             "hole_cards": [str(c) for c in hole_cards],
             "community_cards": [str(c) for c in community_cards],
             "num_opponents": num_opponents,

@@ -2,12 +2,17 @@
 
 Replays a completed hand to score each human decision. Extracted from
 GameSession so the replay logic can be tested independently.
+
+Uses the same range-based equity as the live hint when opponent actions
+are available, so in-game hints and hand review are consistent.
 """
 
 from __future__ import annotations
 
 import logging
 
+from app.analysis.equity import calculate_equity, calculate_equity_vs_range_detailed
+from app.analysis.range_engine import infer_range_pct, range_pct_to_hand_labels
 from app.analysis.scoring import score_decision
 from app.db.models import get_session_factory
 from app.db.repository import save_analysis
@@ -54,7 +59,7 @@ def analyze_hand(
     community = list(state.community_cards)
 
     results = []
-    for action in all_actions:
+    for i, action in enumerate(all_actions):
         pid = action.player_id
         street = action.street.value
 
@@ -70,6 +75,33 @@ def analyze_hand(
             pot_at_decision = pot + sum(current_bets.values())
             num_opp = max(1, len(active_players) - 1)
 
+            # Use range-based equity when we have aggressor actions (same as live hint)
+            equity_override = None
+            equity_details_override = None
+            equity_vs_random = None
+            opponents_here = [pid for pid in active_players if pid != human_id]
+            aggressor_id = max(opponents_here, key=lambda pid: current_bets.get(pid, 0), default=None) if opponents_here else None
+            if aggressor_id:
+                actions_before_this = all_actions[:i]
+                opponent_actions = [a for a in actions_before_this if a.player_id == aggressor_id]
+                range_pct, range_desc = infer_range_pct(opponent_actions, action.street)
+                if 0 < range_pct < 100 and opponent_actions:
+                    range_labels = range_pct_to_hand_labels(range_pct)
+                    eq_data = calculate_equity_vs_range_detailed(
+                        human_player.hole_cards,
+                        _community_for_street(community, street),
+                        range_labels,
+                        num_simulations=1000,
+                    )
+                    equity_override = eq_data["equity"]
+                    equity_details_override = eq_data
+                    equity_vs_random = calculate_equity(
+                        human_player.hole_cards,
+                        _community_for_street(community, street),
+                        num_opponents=num_opp,
+                        num_simulations=1000,
+                    )
+
             score_result = score_decision(
                 hole_cards=human_player.hole_cards,
                 community_cards=_community_for_street(community, street),
@@ -79,10 +111,14 @@ def analyze_hand(
                 to_call=to_call,
                 num_opponents=num_opp,
                 include_details=True,
+                equity_override=equity_override,
+                equity_details_override=equity_details_override,
             )
             score_result["player_id"] = pid
             score_result["street"] = street
             score_result["action_type"] = action.action_type.value
+            if equity_vs_random is not None:
+                score_result["equity_vs_random"] = round(equity_vs_random, 3)
             results.append(score_result)
 
         if action.action_type == ActionType.FOLD:

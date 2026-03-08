@@ -116,6 +116,8 @@ export interface AnalysisResult {
   reasoning?: string;
   recommendation?: string;
   equity_details?: EquityDetails;
+  /** Equity vs random hands (shown when decision used range-based equity) */
+  equity_vs_random?: number;
 }
 
 export interface HintData {
@@ -124,6 +126,11 @@ export interface HintData {
   pot_odds: number;
   recommendation: string;
   equity_details?: EquityDetails;
+  /** When hint is based on inferred opponent range */
+  opponent_range_pct?: number;
+  opponent_range_description?: string;
+  /** Equity vs random hands (shown when hint used range-based equity) */
+  equity_vs_random?: number;
 }
 
 /* ── Player stats types ── */

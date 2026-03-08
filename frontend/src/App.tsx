@@ -21,6 +21,7 @@ import Modal from "./components/Modal";
 import ToastContainer, { type ToastMessage } from "./components/Toast";
 import HandResultBar from "./components/HandResultBar";
 import HintPanel from "./components/HintPanel";
+import HowCalculationsWork from "./components/HowCalculationsWork";
 import TrainingTools, { type TrainingToolsState } from "./components/TrainingTools";
 import PreflopChart, { type Position } from "./components/PreflopChart";
 import PotOddsDisplay from "./components/PotOddsDisplay";
@@ -105,6 +106,7 @@ function App() {
   const [trainingTools, setTrainingTools] = useState<TrainingToolsState>(loadTrainingTools);
   const [showPreflopChart, setShowPreflopChart] = useState(false);
   const [showRangeViz, setShowRangeViz] = useState(false);
+  const [showHowCalculations, setShowHowCalculations] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundManager.enabled);
   const actionLogRef = useRef<ActionEntry[]>([]);
 
@@ -264,6 +266,15 @@ function App() {
             >
               ?
             </button>
+            <button
+              className="btn btn-outline"
+              style={{ width: 32, height: 32, borderRadius: "var(--radius-full)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)", fontSize: 14, fontWeight: 700, fontStyle: "italic" }}
+              onClick={() => setShowHowCalculations(true)}
+              aria-label="How calculations work"
+              title="How calculations work"
+            >
+              i
+            </button>
           </div>
         </div>
       )}
@@ -300,6 +311,7 @@ function App() {
             showCalc={g.showHintCalc}
             onToggleCalc={() => toggle("showHintCalc")}
             onClose={dismissHint}
+            onOpenHowCalculations={() => setShowHowCalculations(true)}
           />
         )}
 
@@ -350,8 +362,14 @@ function App() {
       </Modal>
 
       {g.showReview && g.analysis && (
-        <HandReview analysis={g.analysis} onClose={() => toggle("showReview", false)} />
+        <HandReview
+          analysis={g.analysis}
+          onClose={() => toggle("showReview", false)}
+          onOpenHowCalculations={() => setShowHowCalculations(true)}
+        />
       )}
+
+      <HowCalculationsWork open={showHowCalculations} onClose={() => setShowHowCalculations(false)} />
 
       {g.showDashboard && g.gameId && (
         <SessionDashboard

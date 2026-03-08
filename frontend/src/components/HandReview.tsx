@@ -16,9 +16,10 @@ import { SCORE_COLORS, SCORE_BG } from "../types";
 interface HandReviewProps {
   analysis: AnalysisResult[];
   onClose: () => void;
+  onOpenHowCalculations?: () => void;
 }
 
-const HandReview = ({ analysis, onClose }: HandReviewProps) => {
+const HandReview = ({ analysis, onClose, onOpenHowCalculations }: HandReviewProps) => {
   const [expandedCalc, setExpandedCalc] = useState<Set<number>>(new Set());
 
   const toggleCalc = (idx: number) => {
@@ -76,7 +77,26 @@ const HandReview = ({ analysis, onClose }: HandReviewProps) => {
 
       {/* Decisions */}
       <div>
-        <div className="section-label">Decisions</div>
+        <div className="section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <span>Decisions</span>
+          {onOpenHowCalculations && (
+            <button
+              type="button"
+              onClick={onOpenHowCalculations}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-muted)",
+                fontSize: 11,
+                cursor: "pointer",
+                textDecoration: "underline",
+                padding: 0,
+              }}
+            >
+              How are these calculated?
+            </button>
+          )}
+        </div>
         {analysis.map((a, i) => (
           <div
             key={`${a.street}-${a.action_type}-${i}`}
@@ -89,7 +109,12 @@ const HandReview = ({ analysis, onClose }: HandReviewProps) => {
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                  {Math.round(a.equity * 100)}% equity{a.pot_odds ? ` · ${Math.round(a.pot_odds * 100)}% odds` : ""}
+                  {a.equity_vs_random != null ? (
+                    <>Weighted: {Math.round(a.equity * 100)}% · Equity (vs random): {Math.round(a.equity_vs_random * 100)}%</>
+                  ) : (
+                    <>{Math.round(a.equity * 100)}% equity</>
+                  )}
+                  {a.pot_odds ? ` · ${Math.round(a.pot_odds * 100)}% odds` : ""}
                 </span>
                 <span style={{ color: SCORE_COLORS[a.score] || "var(--text-muted)", fontWeight: 700, fontSize: 13, textTransform: "capitalize" }}>{a.score}</span>
               </div>
