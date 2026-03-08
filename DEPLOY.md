@@ -36,11 +36,26 @@ docker run -d -p 8000:8000 \
 
 ## Hosting options
 
-### 1. **Railway** (simple, good free tier)
+### 1. **Railway** (recommended)
 
-- Connect repo → Railway creates a service from the Dockerfile.
-- Add a **volume** and set **Mount path** to `/data`; set `POKER_DB_PATH=/data/poker_history.db`.
-- WebSockets and single-port deploy are supported. No extra config.
+The repo includes `railway.toml` and a Dockerfile that uses Railway’s `PORT`. No custom start command needed.
+
+**Steps:**
+
+1. **New project** → Deploy from GitHub repo (connect and select this repo).
+2. **Service** → Railway will detect the root `Dockerfile` and build it. No need to set a build command.
+3. **Port** → Railway injects `PORT` at runtime; the container listens on it automatically.
+4. **Volume (for hand history)**  
+   - In the service: **Variables** → **Volumes** → **Add Volume**.  
+   - Set **Mount path** to `/data`.  
+   - The app will use `RAILWAY_VOLUME_MOUNT_PATH` and store the SQLite DB at `/data/poker_history.db` by default.  
+   - To use a different path, set `POKER_DB_PATH` (e.g. `POKER_DB_PATH=/data/poker_history.db`).
+5. **Optional env vars**  
+   - `ANTHROPIC_API_KEY` — for the LLM coach (Coach Claude).  
+   - `CORS_ORIGINS` — only if you host the frontend elsewhere (e.g. `https://your-app.vercel.app`).
+6. **Deploy** → Push to the linked branch or trigger a deploy from the dashboard. Health checks use `/health` (see `railway.toml`).
+
+**If a deploy fails:** check the deploy logs. Typical causes: app not binding to `0.0.0.0`, or not listening on the injected `PORT`. This setup uses `PORT` in the Dockerfile CMD and binds to `0.0.0.0`.
 
 ### 2. **Render** (Docker + free tier)
 

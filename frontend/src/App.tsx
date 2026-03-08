@@ -154,7 +154,7 @@ function App() {
     const gs = g.gameState;
 
     // Reset on new hand
-    const lastAction = (gs as Record<string, unknown>).last_action as
+    const lastAction = (gs as unknown as Record<string, unknown>).last_action as
       | { player_id?: string; action?: string; amount?: number } | undefined;
     if (lastAction?.player_id && lastAction.action) {
       actionLogRef.current.push({
