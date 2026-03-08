@@ -93,7 +93,7 @@ async def request_id_and_access_log(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     request.state.request_id = request_id
     n = getattr(request.app.state, "total_requests", 0) + 1
-    setattr(request.app.state, "total_requests", n)
+    request.app.state.total_requests = n
     start = time.monotonic()
     response = await call_next(request)
     duration_ms = round((time.monotonic() - start) * 1000, 2)

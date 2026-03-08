@@ -268,7 +268,11 @@ class GameSession:
         }
 
     def get_hint(self) -> dict | None:
-        """Calculate the optimal action for the human player right now."""
+        """Calculate the optimal action for the human player right now.
+
+        Uses opponent range inferred from betting when available; otherwise
+        falls back to equity vs random hands.
+        """
         state = self.engine.state
         if state.is_complete:
             return None
@@ -281,15 +285,49 @@ class GameSession:
         if not human_player.hole_cards:
             return None
 
-        # Reconstruct to_call and pot at this moment
         bet_to_match = state.current_bet_to_match
         to_call = max(0, bet_to_match - human_player.current_bet)
         pot = state.total_pot
         num_opp = max(1, len([p for p in state.players if p.is_active]) - 1)
-
         community = list(state.community_cards)
 
+        from app.analysis.equity import calculate_equity, calculate_equity_vs_range_detailed
+        from app.analysis.range_engine import infer_range_pct, range_pct_to_hand_labels
         from app.analysis.scoring import score_decision
+
+        equity_override: float | None = None
+        equity_details_override: dict | None = None
+        opponent_range_pct: float | None = None
+        opponent_range_description: str | None = None
+        equity_vs_random: float | None = None
+
+        # Infer range from aggressor (opponent with highest current bet this hand)
+        opponents = [p for p in state.players if p.is_active and p.player_id != self.human_id]
+        aggressor = max(opponents, key=lambda p: p.current_bet, default=None)
+        if aggressor:
+            opponent_actions = [
+                a for a in state.action_history
+                if a.player_id == aggressor.player_id
+            ]
+            range_pct, range_desc = infer_range_pct(opponent_actions, state.street)
+            if 0 < range_pct < 100 and opponent_actions:
+                range_labels = range_pct_to_hand_labels(range_pct)
+                eq_data = calculate_equity_vs_range_detailed(
+                    human_player.hole_cards,
+                    community,
+                    range_labels,
+                    num_simulations=1000,
+                )
+                equity_override = eq_data["equity"]
+                equity_details_override = eq_data
+                opponent_range_pct = range_pct
+                opponent_range_description = range_desc
+                equity_vs_random = calculate_equity(
+                    human_player.hole_cards,
+                    community,
+                    num_opponents=num_opp,
+                    num_simulations=1000,
+                )
 
         result = score_decision(
             hole_cards=human_player.hole_cards,
@@ -300,15 +338,24 @@ class GameSession:
             to_call=to_call,
             num_opponents=num_opp,
             include_details=True,
+            equity_override=equity_override,
+            equity_details_override=equity_details_override,
         )
 
-        return {
+        out: dict = {
             "optimal_action": result["optimal_action"],
             "equity": result["equity"],
             "pot_odds": result["pot_odds"],
             "recommendation": result["recommendation"],
             "equity_details": result.get("equity_details"),
         }
+        if opponent_range_pct is not None:
+            out["opponent_range_pct"] = opponent_range_pct
+        if opponent_range_description is not None:
+            out["opponent_range_description"] = opponent_range_description
+        if equity_vs_random is not None:
+            out["equity_vs_random"] = round(equity_vs_random, 3)
+        return out
 
     async def get_ws_message(self) -> dict:
         return await self._ws_send.get()
@@ -340,14 +387,15 @@ class GameSession:
         try:
             self.engine.apply_action(self.human_id, action_type, amount)
         except ValueError as e:
-            logger.warning("Invalid human action %s/%s: %s — applying fallback", action_type, amount, e)
-            self._safe_fallback_action(self.human_id)
+            logger.warning("Invalid human action %s/%s: %s — re-requesting action", action_type, amount, e)
             await self._send_ws(
                 {
                     "type": "error",
-                    "data": {"message": f"Invalid action ({action_type.value}), applied fallback."},
+                    "data": {"message": str(e) or f"Invalid action: {action_type.value} with amount {amount}. Please try again."},
                 }
             )
+            await self._handle_human_turn()
+            return
 
     async def _handle_bot_turn(self, bot_id: str) -> None:
         bot = self.bots.get(bot_id)
